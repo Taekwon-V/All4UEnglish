@@ -307,6 +307,20 @@ export const StorageService = {
     }
   },
 
+  setGrammarVariations: (grammarId, variations) => {
+    let changed = null;
+    const list = StorageService.getGrammar().map(item => {
+      if (item.id === grammarId) {
+        changed = { ...item, variations: variations || [] };
+        return changed;
+      }
+      return item;
+    });
+    localStorage.setItem(STORAGE_KEYS.GRAMMAR, JSON.stringify(list));
+    if (changed) syncToFirestore('grammar', changed.id, changed);
+    return list;
+  },
+
   addGrammarVariation: (grammarId, variation) => {
     let changed = null;
     const list = StorageService.getGrammar().map(item => {
@@ -366,6 +380,20 @@ export const StorageService = {
       console.error('숙어 저장 실패:', e);
       return [];
     }
+  },
+
+  setIdiomVariations: (idiomId, variations) => {
+    let changed = null;
+    const list = StorageService.getIdioms().map(item => {
+      if (item.id === idiomId) {
+        changed = { ...item, variations: variations || [] };
+        return changed;
+      }
+      return item;
+    });
+    localStorage.setItem(STORAGE_KEYS.IDIOMS, JSON.stringify(list));
+    if (changed) syncToFirestore('idioms', changed.id, changed);
+    return list;
   },
 
   addIdiomVariation: (idiomId, variation) => {
@@ -434,6 +462,20 @@ export const StorageService = {
       console.error('단어 저장 실패:', e);
       return [];
     }
+  },
+
+  setWordVariations: (wordId, variations) => {
+    let changed = null;
+    const list = StorageService.getWords().map(item => {
+      if (item.id === wordId) {
+        changed = { ...item, variations: variations || [] };
+        return changed;
+      }
+      return item;
+    });
+    localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(list));
+    if (changed) syncToFirestore('words', changed.id, changed);
+    return list;
   },
 
   addWordVariation: (wordId, variation) => {

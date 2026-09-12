@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Layers, Bookmark, Sparkles, Volume2, Plus, 
-  Check, Trash2, Search, Filter, Quote, ArrowUpRight 
+  Check, Trash2, Search, Filter, Quote, ArrowUpRight, Loader2 
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { GeminiService } from '../../services/gemini';
@@ -32,24 +32,33 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
     refreshData();
   }, []);
 
-  // TTS 발음 듣기
-  const handleSpeak = (text) => {
-    SpeechService.speak(text, 1.0);
+  // 검색 필터링 헬퍼
+  const filterList = (list, searchFields) => {
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.toLowerCase();
+    return list.filter(item => 
+      searchFields.some(field => (item[field] || '').toLowerCase().includes(q))
+    );
   };
 
-  // AI 새 예문 2~3개 실시간 생성
+  // 발음 듣기
+  const handleSpeak = (text) => {
+    SpeechService.speak(text);
+  };
+
+  // AI 새 예문 실시간 생성 (기존 생성 문장 지우고 새로 교체)
   const handleGenerateVariations = async (type, item) => {
     setGeneratingId(item.id);
     try {
       const newVariations = await GeminiService.generateVariations(type, item, item.originalSentence);
       
-      // 스토리지에 생성된 예문 추가 저장
+      // 스토리지에 기존 생성 예문을 새로 생성된 예문으로 교체
       if (type === 'word') {
-        newVariations.forEach(v => StorageService.addWordVariation(item.id, v));
+        StorageService.setWordVariations(item.id, newVariations);
       } else if (type === 'grammar') {
-        newVariations.forEach(v => StorageService.addGrammarVariation(item.id, v));
+        StorageService.setGrammarVariations(item.id, newVariations);
       } else if (type === 'idiom') {
-        newVariations.forEach(v => StorageService.addIdiomVariation(item.id, v));
+        StorageService.setIdiomVariations(item.id, newVariations);
       }
       refreshData();
     } catch (e) {
@@ -163,12 +172,26 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                       disabled={generatingId === item.id}
                       onClick={() => handleGenerateVariations('word', item)}
                     >
-                      <Sparkles size={14} />
-                      <span>{generatingId === item.id ? '새 예문 만드는 중...' : '새 예문 2~3개 생성 ✨'}</span>
+                      {generatingId === item.id ? (
+                        <>
+                          <Loader2 size={14} className="spin-loader" />
+                          <span>새 예문 생성 중...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={14} />
+                          <span>새 예문 생성</span>
+                        </>
+                      )}
                     </button>
                   </div>
 
-                  {item.variations && item.variations.length > 0 ? (
+                  {generatingId === item.id ? (
+                    <div className="variations-loading-box">
+                      <Loader2 size={16} className="spin-loader" />
+                      <span>기존 예문을 비우고 새로운 실생활 예문을 생성 중입니다...</span>
+                    </div>
+                  ) : item.variations && item.variations.length > 0 ? (
                     <div className="variations-list">
                       {item.variations.map((v, vIdx) => {
                         const vKey = `${item.id}-${vIdx}`;
@@ -257,12 +280,26 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                       disabled={generatingId === item.id}
                       onClick={() => handleGenerateVariations('grammar', item)}
                     >
-                      <Sparkles size={14} />
-                      <span>{generatingId === item.id ? '새 예문 만드는 중...' : '새 예문 2~3개 생성 ✨'}</span>
+                      {generatingId === item.id ? (
+                        <>
+                          <Loader2 size={14} className="spin-loader" />
+                          <span>새 예문 생성 중...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={14} />
+                          <span>새 예문 생성</span>
+                        </>
+                      )}
                     </button>
                   </div>
 
-                  {item.variations && item.variations.length > 0 ? (
+                  {generatingId === item.id ? (
+                    <div className="variations-loading-box">
+                      <Loader2 size={16} className="spin-loader" />
+                      <span>기존 예문을 비우고 새로운 실생활 예문을 생성 중입니다...</span>
+                    </div>
+                  ) : item.variations && item.variations.length > 0 ? (
                     <div className="variations-list">
                       {item.variations.map((v, vIdx) => {
                         const vKey = `${item.id}-${vIdx}`;
@@ -354,12 +391,26 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                       disabled={generatingId === item.id}
                       onClick={() => handleGenerateVariations('idiom', item)}
                     >
-                      <Sparkles size={14} />
-                      <span>{generatingId === item.id ? '새 예문 만드는 중...' : '새 예문 2~3개 생성 ✨'}</span>
+                      {generatingId === item.id ? (
+                        <>
+                          <Loader2 size={14} className="spin-loader" />
+                          <span>새 예문 생성 중...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={14} />
+                          <span>새 예문 생성</span>
+                        </>
+                      )}
                     </button>
                   </div>
 
-                  {item.variations && item.variations.length > 0 ? (
+                  {generatingId === item.id ? (
+                    <div className="variations-loading-box">
+                      <Loader2 size={16} className="spin-loader" />
+                      <span>기존 예문을 비우고 새로운 실생활 예문을 생성 중입니다...</span>
+                    </div>
+                  ) : item.variations && item.variations.length > 0 ? (
                     <div className="variations-list">
                       {item.variations.map((v, vIdx) => {
                         const vKey = `${item.id}-${vIdx}`;
