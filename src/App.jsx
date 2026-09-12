@@ -259,7 +259,14 @@ export default function App() {
       {/* =========================================================================
           메인 바디 콘텐츠 (5대 탭 분기)
           ========================================================================= */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '16px 16px 8px' }}>
+      <main style={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        overflowY: 'auto', 
+        padding: '16px 16px 8px',
+        paddingBottom: 'calc(var(--safe-bottom, 14px) + 72px)'
+      }}>
         
         {/* 1. 문장 입력 & AI 발굴 */}
         {activeTab === 'input' && (
@@ -268,7 +275,7 @@ export default function App() {
           />
         )}
 
-        {/* 2. 문장장 (Sentences Master & Playlists) */}
+        {/* 2. 문장학습 (Sentences Master & Playlists) */}
         {activeTab === 'sentences' && (
           <SentenceManager 
             onPlayPlaylist={handlePlayPlaylistInRadio}
@@ -297,17 +304,9 @@ export default function App() {
       </main>
 
       {/* =========================================================================
-          하단 글로벌 바텀 네비게이션 바 (5단 탭)
+          하단 글로벌 바텀 네비게이션 바 (화면 하단 위치 고정)
           ========================================================================= */}
-      <nav style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(5, 1fr)',
-        background: '#ffffff',
-        borderTop: '1px solid rgba(45, 106, 79, 0.1)',
-        paddingTop: '8px',
-        paddingBottom: 'calc(var(--safe-bottom, 10px) + 6px)',
-        zIndex: 100
-      }}>
+      <nav className="global-bottom-nav">
         <button
           type="button"
           onClick={() => setActiveTab('input')}
@@ -341,7 +340,7 @@ export default function App() {
           }}
         >
           <ListOrdered size={20} />
-          <span style={{ fontSize: '10.5px', fontWeight: activeTab === 'sentences' ? 700 : 500 }}>문장장</span>
+          <span style={{ fontSize: '10.5px', fontWeight: activeTab === 'sentences' ? 700 : 500 }}>문장학습</span>
         </button>
 
         <button

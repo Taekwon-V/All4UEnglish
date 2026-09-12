@@ -317,7 +317,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
           <div className="discovery-banner">
             <div className="banner-icon">✨</div>
             <div>
-              <h4>문장장에 저장 완료!</h4>
+              <h4>문장학습에 저장 완료!</h4>
               <p>문장에서 찾은 표현들을 원하는 보관함으로 쏙쏙 넣어보세요.</p>
             </div>
           </div>

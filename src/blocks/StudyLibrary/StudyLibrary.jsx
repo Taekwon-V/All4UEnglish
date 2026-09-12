@@ -191,11 +191,11 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                               >
                                 {isSaved ? (
                                   <>
-                                    <Check size={13} /> <span>문장장에 담김</span>
+                                    <Check size={13} /> <span>문장학습에 담김</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Plus size={13} /> <span>문장장으로 저장</span>
+                                    <Plus size={13} /> <span>문장학습에 저장</span>
                                   </>
                                 )}
                               </button>
@@ -285,11 +285,11 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                               >
                                 {isSaved ? (
                                   <>
-                                    <Check size={13} /> <span>문장장에 담김</span>
+                                    <Check size={13} /> <span>문장학습에 담김</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Plus size={13} /> <span>문장장으로 저장</span>
+                                    <Plus size={13} /> <span>문장학습에 저장</span>
                                   </>
                                 )}
                               </button>
@@ -382,11 +382,11 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                               >
                                 {isSaved ? (
                                   <>
-                                    <Check size={13} /> <span>문장장에 담김</span>
+                                    <Check size={13} /> <span>문장학습에 담김</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Plus size={13} /> <span>문장장으로 저장</span>
+                                    <Plus size={13} /> <span>문장학습에 저장</span>
                                   </>
                                 )}
                               </button>

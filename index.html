@@ -15,6 +15,21 @@
     
     <!-- Pretendard CDN for Korean -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+
+    <!-- 카카오톡 인앱 브라우저 -> 기본 브라우저 자동 전환 스크립트 (구글 로그인 차단 방지) -->
+    <script>
+      (function() {
+        var userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        if (/KAKAOTALK/i.test(userAgent)) {
+          if (/Android/i.test(userAgent)) {
+            var cleanUrl = location.href.replace(/^https?:\/\//i, '');
+            location.href = 'intent://' + cleanUrl + '#Intent;scheme=https;package=com.android.chrome;end';
+          } else if (/iPhone|iPad|iPod/i.test(userAgent)) {
+            location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href);
+          }
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
