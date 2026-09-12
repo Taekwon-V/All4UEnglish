@@ -119,7 +119,8 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
       dictionaryMeanings: [clean],
       nuanceKo: `'${inputText}' 문장에서 담은 단어`,
       originalSentence: inputText,
-      status: 'review'
+      sentenceId: savedSentenceId,
+      status: 'learning'
     });
 
     setTappedWords(prev => ({ ...prev, [wordKey]: true }));
@@ -136,7 +137,8 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
           dictionaryMeanings: info.dictionaryMeanings.slice(0, 3),
           nuanceKo: info.nuanceKo || info.dictionaryMeanings.join(', '),
           originalSentence: inputText,
-          status: 'review'
+          sentenceId: savedSentenceId,
+          status: 'learning'
         });
       }
     }).catch(() => {});
@@ -235,7 +237,8 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
       dictionaryMeanings: dictMeanings.slice(0, 3),
       nuanceKo: wordItem.nuanceKo || dictMeanings.join(', '),
       originalSentence: inputText,
-      status: 'review'
+      sentenceId: savedSentenceId,
+      status: 'learning'
     });
     setAddedItems(prev => ({
       ...prev,
@@ -251,7 +254,9 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
       pattern: g.pattern,
       tag: g.tag || '#문법패턴',
       explanation: g.explanation || '',
-      originalSentence: inputText
+      originalSentence: inputText,
+      sentenceId: savedSentenceId,
+      status: 'learning'
     });
     setAddedItems(prev => ({ ...prev, grammar: true }));
   };
@@ -261,7 +266,9 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     StorageService.saveIdiom({
       idiom: idiomItem.idiom,
       meaning: idiomItem.meaning,
-      originalSentence: inputText
+      originalSentence: inputText,
+      sentenceId: savedSentenceId,
+      status: 'learning'
     });
     setAddedItems(prev => ({
       ...prev,

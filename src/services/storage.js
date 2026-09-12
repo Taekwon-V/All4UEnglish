@@ -356,6 +356,7 @@ export const StorageService = {
         targetItem = {
           ...grammarData,
           id: grammarData.id || 'g-' + Date.now(),
+          status: grammarData.status || 'learning',
           variations: grammarData.variations || [],
           isBookmarked: grammarData.isBookmarked || false,
           createdAt: new Date().toISOString()
@@ -369,6 +370,20 @@ export const StorageService = {
       console.error('문법 저장 실패:', e);
       return [];
     }
+  },
+
+  setGrammarStatus: (grammarId, status) => {
+    let changed = null;
+    const list = StorageService.getGrammar().map(item => {
+      if (item.id === grammarId) {
+        changed = { ...item, status, reviewedAt: new Date().toISOString() };
+        return changed;
+      }
+      return item;
+    });
+    localStorage.setItem(STORAGE_KEYS.GRAMMAR, JSON.stringify(list));
+    if (changed) syncToFirestore('grammar', changed.id, changed);
+    return list;
   },
 
   setGrammarVariations: (grammarId, variations) => {
@@ -441,6 +456,7 @@ export const StorageService = {
         targetItem = {
           ...idiomData,
           id: idiomData.id || 'i-' + Date.now(),
+          status: idiomData.status || 'learning',
           variations: idiomData.variations || [],
           isBookmarked: idiomData.isBookmarked || false,
           createdAt: new Date().toISOString()
@@ -454,6 +470,20 @@ export const StorageService = {
       console.error('숙어 저장 실패:', e);
       return [];
     }
+  },
+
+  setIdiomStatus: (idiomId, status) => {
+    let changed = null;
+    const list = StorageService.getIdioms().map(item => {
+      if (item.id === idiomId) {
+        changed = { ...item, status, reviewedAt: new Date().toISOString() };
+        return changed;
+      }
+      return item;
+    });
+    localStorage.setItem(STORAGE_KEYS.IDIOMS, JSON.stringify(list));
+    if (changed) syncToFirestore('idioms', changed.id, changed);
+    return list;
   },
 
   setIdiomVariations: (idiomId, variations) => {
@@ -530,7 +560,7 @@ export const StorageService = {
         targetItem = {
           ...wordData,
           id: wordData.id || 'w-' + Date.now(),
-          status: wordData.status || 'review',
+          status: wordData.status || 'learning',
           isBookmarked: wordData.isBookmarked || false,
           variations: wordData.variations || [],
           reviewCount: 1,

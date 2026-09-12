@@ -3,7 +3,8 @@ import {
   PlayCircle, Plus, Bookmark, Volume2, 
   Trash2, FolderPlus, Check, ChevronRight, Headphones, 
   CheckCircle2, RotateCcw, Search, Sparkles, BookOpen,
-  Calendar, Tag, ChevronDown, ChevronUp, ArrowUpDown, X
+  Calendar, Tag, ChevronDown, ChevronUp, ArrowUpDown, X,
+  Wand2, Layers
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { SpeechService } from '../../services/speech';
@@ -16,6 +17,13 @@ export default function SentenceManager({ onPlayPlaylist }) {
   
   const [sentences, setSentences] = useState([]);
   const [playlists, setPlaylists] = useState([]);
+  const [words, setWords] = useState([]);
+  const [grammar, setGrammar] = useState([]);
+  const [idioms, setIdioms] = useState([]);
+
+  // 서재 학습자산 AI 추출 로딩 상태 ({ [sentenceId]: boolean }) 및 토스트
+  const [extractingMap, setExtractingMap] = useState({});
+  const [toastMessage, setToastMessage] = useState(null);
   
   // 아코디언 펼침 상태 관리 ({ [id]: boolean })
   const [expandedIds, setExpandedIds] = useState({});
@@ -43,6 +51,9 @@ export default function SentenceManager({ onPlayPlaylist }) {
   const loadData = () => {
     setSentences(StorageService.getSentences());
     setPlaylists(StorageService.getPlaylists());
+    setWords(StorageService.getWords());
+    setGrammar(StorageService.getGrammar());
+    setIdioms(StorageService.getIdioms());
   };
 
   useEffect(() => {
@@ -278,6 +289,132 @@ export default function SentenceManager({ onPlayPlaylist }) {
     }
   };
 
+  // 문장과 연결된 서재 학습 자산 (단어, 문법, 숙어) 필터링
+  const getLinkedAssets = (sentenceItem) => {
+    const sId = sentenceItem.id;
+    const sText = (sentenceItem.text || '').trim().toLowerCase();
+    const sOrig = (sentenceItem.originalText || '').trim().toLowerCase();
+
+    const linkedWords = words.filter(w => {
+      if (w.sentenceId && w.sentenceId === sId) return true;
+      if (w.originalSentence) {
+        const orig = w.originalSentence.trim().toLowerCase();
+        if (orig === sText || orig === sOrig) return true;
+      }
+      if (w.word && w.word.length >= 2) {
+        try {
+          const regex = new RegExp(`\\b${w.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+          if (regex.test(sentenceItem.text) || (sentenceItem.originalText && regex.test(sentenceItem.originalText))) return true;
+        } catch {}
+      }
+      return false;
+    });
+
+    const linkedGrammar = grammar.filter(g => {
+      if (g.sentenceId && g.sentenceId === sId) return true;
+      if (g.originalSentence) {
+        const orig = g.originalSentence.trim().toLowerCase();
+        if (orig === sText || orig === sOrig) return true;
+      }
+      return false;
+    });
+
+    const linkedIdioms = idioms.filter(i => {
+      if (i.sentenceId && i.sentenceId === sId) return true;
+      if (i.originalSentence) {
+        const orig = i.originalSentence.trim().toLowerCase();
+        if (orig === sText || orig === sOrig) return true;
+      }
+      if (i.idiom && i.idiom.length >= 2) {
+        if (sText.includes(i.idiom.trim().toLowerCase()) || sOrig.includes(i.idiom.trim().toLowerCase())) return true;
+      }
+      return false;
+    });
+
+    return { linkedWords, linkedGrammar, linkedIdioms };
+  };
+
+  // 문장에서 AI 단어·문법·숙어 추출 및 서재 자동 등록
+  const handleExtractAssets = async (sentenceItem) => {
+    const sId = sentenceItem.id;
+    setExtractingMap(prev => ({ ...prev, [sId]: true }));
+    try {
+      const result = await GeminiService.discoverFromSentence(sentenceItem.text);
+      if (result) {
+        let addedCount = 0;
+        // 1. 단어 저장
+        if (Array.isArray(result.words)) {
+          result.words.forEach(w => {
+            let dictMeanings = w.dictionaryMeanings;
+            if (!Array.isArray(dictMeanings) || dictMeanings.length === 0) {
+              const fallback = w.meaningKo || w.nuanceKo || '';
+              dictMeanings = fallback ? fallback.split(/[,/·\n]/).map(s => s.trim()).filter(Boolean) : [];
+              if (dictMeanings.length === 0) dictMeanings = [w.word];
+            }
+            StorageService.saveWord({
+              word: w.word,
+              phonetic: w.phonetic || '',
+              partOfSpeech: w.partOfSpeech || '단어',
+              dictionaryMeanings: dictMeanings.slice(0, 3),
+              nuanceKo: w.nuanceKo || dictMeanings.join(', '),
+              originalSentence: sentenceItem.text,
+              sentenceId: sId,
+              status: 'learning'
+            });
+            addedCount++;
+          });
+        }
+        // 2. 문법 패턴 저장
+        if (result.suggestedGrammar?.pattern) {
+          StorageService.saveGrammar({
+            pattern: result.suggestedGrammar.pattern,
+            tag: result.suggestedGrammar.tag || '#문법패턴',
+            explanation: result.suggestedGrammar.explanation || '',
+            originalSentence: sentenceItem.text,
+            sentenceId: sId,
+            status: 'learning'
+          });
+          addedCount++;
+        }
+        // 3. 숙어 저장
+        if (Array.isArray(result.idioms)) {
+          result.idioms.forEach(i => {
+            StorageService.saveIdiom({
+              idiom: i.idiom,
+              meaning: i.meaning,
+              originalSentence: sentenceItem.text,
+              sentenceId: sId,
+              status: 'learning'
+            });
+            addedCount++;
+          });
+        }
+        loadData();
+        setToastMessage(`✨ 단어·문법·숙어가 추출되어 서재에 연결되었습니다! (${addedCount}개)`);
+        setTimeout(() => setToastMessage(null), 2500);
+      }
+    } catch (e) {
+      console.error('추출 실패:', e);
+      setToastMessage('단어·문법·숙어 추출 중 오류가 발생했습니다.');
+      setTimeout(() => setToastMessage(null), 2500);
+    } finally {
+      setExtractingMap(prev => ({ ...prev, [sId]: false }));
+    }
+  };
+
+  // 연결된 서재 자산 학습 상태 토글
+  const handleToggleAssetStatus = (type, assetId, currentStatus) => {
+    const nextStatus = currentStatus === 'mastered' ? 'learning' : 'mastered';
+    if (type === 'word') {
+      StorageService.setWordStatus(assetId, nextStatus);
+    } else if (type === 'grammar') {
+      StorageService.setGrammarStatus(assetId, nextStatus);
+    } else if (type === 'idiom') {
+      StorageService.setIdiomStatus(assetId, nextStatus);
+    }
+    loadData();
+  };
+
   // 개별 문장 아코디언 카드 렌더러
   const renderSentenceRow = (item) => {
     const isExpanded = !!expandedIds[item.id];
@@ -288,6 +425,8 @@ export default function SentenceManager({ onPlayPlaylist }) {
       : ['주제없음'];
     const unusedTopics = allExistingTopics.filter(t => t !== '주제없음' && !tagList.includes(t));
     const varData = variationsState[item.id];
+    const { linkedWords, linkedGrammar, linkedIdioms } = getLinkedAssets(item);
+    const isExtractingAssets = !!extractingMap[item.id];
 
     return (
       <div key={item.id} className={`sentence-accordion-item ${isExpanded ? 'is-open' : ''}`}>
@@ -375,6 +514,137 @@ export default function SentenceManager({ onPlayPlaylist }) {
               >
                 <Trash2 size={14} />
               </button>
+            </div>
+
+            {/* 연결된 서재 학습 자산 (추출된 단어 · 문법 · 숙어) */}
+            <div className="sentence-linked-assets-section">
+              <div className="assets-section-top">
+                <div className="assets-title-wrap">
+                  <Layers size={14} color="#059669" />
+                  <span className="assets-section-title">연결된 서재 학습 자산</span>
+                </div>
+                <button 
+                  type="button" 
+                  className="extract-assets-btn"
+                  onClick={() => handleExtractAssets(item)}
+                  disabled={isExtractingAssets}
+                  title="AI로 이 문장에서 단어, 문법, 숙어를 추출하여 서재에 자동 연결"
+                >
+                  <Wand2 size={12} />
+                  <span>{isExtractingAssets ? 'AI 추출 중...' : '✨ AI 단어·숙어·문법 추출'}</span>
+                </button>
+              </div>
+
+              {/* 1. 추출된 단어 목록 */}
+              {linkedWords.length > 0 && (
+                <div className="asset-category-block">
+                  <span className="asset-cat-label">📖 단어장 ({linkedWords.length})</span>
+                  <div className="asset-items-wrap">
+                    {linkedWords.map(w => {
+                      const isMastered = w.status === 'mastered';
+                      const meaningsStr = Array.isArray(w.dictionaryMeanings) && w.dictionaryMeanings.length > 0
+                        ? w.dictionaryMeanings.join(', ')
+                        : w.nuanceKo || '';
+                      return (
+                        <div key={w.id} className={`asset-badge-card ${isMastered ? 'mastered' : ''}`}>
+                          <div className="badge-term-row">
+                            <strong className="term-text">{w.word}</strong>
+                            <button 
+                              type="button" 
+                              className="badge-speak-btn"
+                              onClick={() => handleSpeak(w.word)}
+                              title="발음 듣기"
+                            >
+                              <Volume2 size={12} />
+                            </button>
+                          </div>
+                          {meaningsStr && <span className="badge-meaning-text">{meaningsStr}</span>}
+                          <button 
+                            type="button" 
+                            className={`badge-status-toggle ${isMastered ? 'done' : 'learning'}`}
+                            onClick={() => handleToggleAssetStatus('word', w.id, w.status)}
+                            title="학습 상태 변경"
+                          >
+                            {isMastered ? '외움 ✓' : '학습중'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 2. 추출된 문법 패턴 목록 */}
+              {linkedGrammar.length > 0 && (
+                <div className="asset-category-block">
+                  <span className="asset-cat-label">🪪 문법장 ({linkedGrammar.length})</span>
+                  <div className="asset-items-wrap">
+                    {linkedGrammar.map(g => {
+                      const isMastered = g.status === 'mastered';
+                      return (
+                        <div key={g.id} className={`asset-badge-card ${isMastered ? 'mastered' : ''}`}>
+                          <div className="badge-term-row">
+                            <strong className="term-text">{g.pattern}</strong>
+                          </div>
+                          {g.explanation && <span className="badge-meaning-text">{g.explanation}</span>}
+                          <button 
+                            type="button" 
+                            className={`badge-status-toggle ${isMastered ? 'done' : 'learning'}`}
+                            onClick={() => handleToggleAssetStatus('grammar', g.id, g.status)}
+                            title="학습 상태 변경"
+                          >
+                            {isMastered ? '외움 ✓' : '학습중'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 3. 추출된 숙어 목록 */}
+              {linkedIdioms.length > 0 && (
+                <div className="asset-category-block">
+                  <span className="asset-cat-label">🔖 숙어장 ({linkedIdioms.length})</span>
+                  <div className="asset-items-wrap">
+                    {linkedIdioms.map(i => {
+                      const isMastered = i.status === 'mastered';
+                      return (
+                        <div key={i.id} className={`asset-badge-card ${isMastered ? 'mastered' : ''}`}>
+                          <div className="badge-term-row">
+                            <strong className="term-text">{i.idiom}</strong>
+                            <button 
+                              type="button" 
+                              className="badge-speak-btn"
+                              onClick={() => handleSpeak(i.idiom)}
+                              title="발음 듣기"
+                            >
+                              <Volume2 size={12} />
+                            </button>
+                          </div>
+                          {i.meaning && <span className="badge-meaning-text">{i.meaning}</span>}
+                          <button 
+                            type="button" 
+                            className={`badge-status-toggle ${isMastered ? 'done' : 'learning'}`}
+                            onClick={() => handleToggleAssetStatus('idiom', i.id, i.status)}
+                            title="학습 상태 변경"
+                          >
+                            {isMastered ? '외움 ✓' : '학습중'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 아직 아무것도 연결되지 않은 경우 안내 */}
+              {linkedWords.length === 0 && linkedGrammar.length === 0 && linkedIdioms.length === 0 && (
+                <div className="empty-assets-box">
+                  <span>아직 이 문장에서 추출된 서재 항목이 없습니다.</span>
+                  <span className="empty-assets-hint">상단의 [✨ AI 단어·숙어·문법 추출]을 누르면 즉시 분석되어 서재와 자동 연결됩니다.</span>
+                </div>
+              )}
             </div>
 
             {/* 주제(태그) 관리 섹션: 군더더기 텍스트 제거 및 직관적 선택/추가 */}
@@ -494,6 +764,12 @@ export default function SentenceManager({ onPlayPlaylist }) {
 
   return (
     <div className="sentence-manager-container">
+      {toastMessage && (
+        <div className="sentence-toast-bubble animate-fade-in">
+          {toastMessage}
+        </div>
+      )}
+
       {/* 1. 상단 3단 메인 세그먼트 (상단 여백 및 탭 디자인 통일) */}
       <div className="sentence-sticky-header">
         <div className="section-segment-bar">

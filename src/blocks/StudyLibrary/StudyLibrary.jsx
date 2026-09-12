@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Layers, Bookmark, Sparkles, Volume2, Plus, 
   Check, Trash2, Search, Filter, Quote, ArrowUpRight, Loader2,
-  ChevronDown, ChevronUp, Calendar, ArrowUpDown, X, Zap
+  ChevronDown, ChevronUp, Calendar, ArrowUpDown, X, Zap,
+  CheckCircle2, RotateCcw
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { GeminiService } from '../../services/gemini';
@@ -11,6 +12,7 @@ import './StudyLibrary.css';
 
 export default function StudyLibrary({ initialTab = 'words', onNavigateToSentence }) {
   const [activeTab, setActiveTab] = useState(initialTab); // 'words' | 'grammar' | 'idioms'
+  const [statusFilter, setStatusFilter] = useState('learning'); // 'learning' | 'mastered'
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('latest'); // 'latest' | 'oldest' | 'alpha'
   
@@ -81,6 +83,19 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
       else if (type === 'idiom') StorageService.deleteIdiom(item.id);
       refreshData();
     }
+  };
+
+  // 학습 상태 토글 (학습 중 <-> 학습 완료)
+  const handleToggleStatus = (type, item, newStatus, e) => {
+    e?.stopPropagation();
+    if (type === 'words' || type === 'word') {
+      StorageService.setWordStatus(item.id, newStatus);
+    } else if (type === 'grammar') {
+      StorageService.setGrammarStatus(item.id, newStatus);
+    } else if (type === 'idioms' || type === 'idiom') {
+      StorageService.setIdiomStatus(item.id, newStatus);
+    }
+    refreshData();
   };
 
   // 발음 듣기
@@ -258,6 +273,14 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
   // 정렬 & 검색 필터링
   const getProcessedItems = (list, type) => {
     let filtered = list;
+
+    // 학습 상태 분리 필터 (학습 중 vs 학습 완료)
+    if (statusFilter === 'learning') {
+      filtered = filtered.filter(item => item.status !== 'mastered');
+    } else if (statusFilter === 'mastered') {
+      filtered = filtered.filter(item => item.status === 'mastered');
+    }
+
     const q = searchQuery.toLowerCase().trim();
 
     if (q) {
@@ -307,9 +330,13 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
   const processedGrammar = getProcessedItems(grammar, 'grammar');
   const processedIdioms = getProcessedItems(idioms, 'idioms');
 
+  const currentCategoryList = activeTab === 'words' ? words : activeTab === 'grammar' ? grammar : idioms;
+  const learningCount = currentCategoryList.filter(item => item.status !== 'mastered').length;
+  const masteredCount = currentCategoryList.filter(item => item.status === 'mastered').length;
+
   return (
     <div className="study-library-container">
-      {/* 상단 고정 헤더: 탭 + 검색 + 정렬 + 직접 추가 버튼 */}
+      {/* 상단 고정 헤더: 탭 + 서브 학습상태 탭 + 검색 + 정렬 + 직접 추가 버튼 */}
       <div className="library-sticky-header">
         {/* 3단 세그먼트 상단 탭 */}
         <div className="library-tabs">
@@ -338,6 +365,27 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
           >
             <Bookmark size={16} />
             <span>숙어장 ({idioms.length})</span>
+          </button>
+        </div>
+
+        {/* 2단 학습 중 vs 학습 완료 서브 세그먼트 바 */}
+        <div className="library-sub-status-bar">
+          <button 
+            type="button" 
+            className={`lib-sub-status-btn ${statusFilter === 'learning' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('learning')}
+          >
+            <BookOpen size={14} />
+            <span>학습 중 ({learningCount})</span>
+          </button>
+
+          <button 
+            type="button" 
+            className={`lib-sub-status-btn ${statusFilter === 'mastered' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('mastered')}
+          >
+            <CheckCircle2 size={14} />
+            <span>학습 완료 ({masteredCount})</span>
           </button>
         </div>
 
@@ -410,6 +458,9 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                     <div className="summary-line-2">
                       <div className="summary-meaning-col">
                         <span className="part-badge">{item.partOfSpeech || '단어'}</span>
+                        {item.status === 'mastered' && (
+                          <span className="mastered-pill-badge">외움 ✓</span>
+                        )}
                         <span className="summary-meaning-text">
                           {item.dictionaryMeanings && item.dictionaryMeanings.length > 0 
                             ? item.dictionaryMeanings.join(', ')
@@ -441,6 +492,29 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                   {/* 펼쳤을 때 나타나는 세부 설명 박스 */}
                   {isExpanded && (
                     <div className="accordion-body-content">
+                      {/* 학습 완료 / 다시 학습 액션 바 */}
+                      <div className="lib-item-status-row">
+                        {item.status !== 'mastered' ? (
+                          <button 
+                            type="button" 
+                            className="lib-status-toggle-btn master-btn"
+                            onClick={(e) => handleToggleStatus('words', item, 'mastered', e)}
+                          >
+                            <Check size={14} />
+                            <span>외웠어요 (학습 완료)</span>
+                          </button>
+                        ) : (
+                          <button 
+                            type="button" 
+                            className="lib-status-toggle-btn review-btn"
+                            onClick={(e) => handleToggleStatus('words', item, 'learning', e)}
+                          >
+                            <RotateCcw size={13} />
+                            <span>다시 학습하기</span>
+                          </button>
+                        )}
+                      </div>
+
                       {item.phonetic && (
                         <div className="expanded-top-info">
                           <span className="phonetic">{item.phonetic}</span>
@@ -605,6 +679,9 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                     <div className="summary-line-2">
                       <div className="summary-meaning-col">
                         <span className="pattern-badge">{item.tag || '#문법패턴'}</span>
+                        {item.status === 'mastered' && (
+                          <span className="mastered-pill-badge">외움 ✓</span>
+                        )}
                         <span className="summary-meaning-text">{item.explanation}</span>
                       </div>
 
@@ -632,6 +709,29 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                   {/* 펼친 내용 */}
                   {isExpanded && (
                     <div className="accordion-body-content">
+                      {/* 학습 완료 / 다시 학습 액션 바 */}
+                      <div className="lib-item-status-row">
+                        {item.status !== 'mastered' ? (
+                          <button 
+                            type="button" 
+                            className="lib-status-toggle-btn master-btn"
+                            onClick={(e) => handleToggleStatus('grammar', item, 'mastered', e)}
+                          >
+                            <Check size={14} />
+                            <span>외웠어요 (학습 완료)</span>
+                          </button>
+                        ) : (
+                          <button 
+                            type="button" 
+                            className="lib-status-toggle-btn review-btn"
+                            onClick={(e) => handleToggleStatus('grammar', item, 'learning', e)}
+                          >
+                            <RotateCcw size={13} />
+                            <span>다시 학습하기</span>
+                          </button>
+                        )}
+                      </div>
+
                       <p className="explanation-desc">{item.explanation}</p>
 
                       {/* 원문 디폴트 예시 */}
@@ -766,6 +866,9 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                     <div className="summary-line-2">
                       <div className="summary-meaning-col">
                         <span className="idiom-badge">{item.roleTag || '숙어/표현'}</span>
+                        {item.status === 'mastered' && (
+                          <span className="mastered-pill-badge">외움 ✓</span>
+                        )}
                         <span className="summary-meaning-text">{item.meaning}</span>
                       </div>
 
@@ -793,6 +896,29 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                   {/* 펼친 내용 */}
                   {isExpanded && (
                     <div className="accordion-body-content">
+                      {/* 학습 완료 / 다시 학습 액션 바 */}
+                      <div className="lib-item-status-row">
+                        {item.status !== 'mastered' ? (
+                          <button 
+                            type="button" 
+                            className="lib-status-toggle-btn master-btn"
+                            onClick={(e) => handleToggleStatus('idioms', item, 'mastered', e)}
+                          >
+                            <Check size={14} />
+                            <span>외웠어요 (학습 완료)</span>
+                          </button>
+                        ) : (
+                          <button 
+                            type="button" 
+                            className="lib-status-toggle-btn review-btn"
+                            onClick={(e) => handleToggleStatus('idioms', item, 'learning', e)}
+                          >
+                            <RotateCcw size={13} />
+                            <span>다시 학습하기</span>
+                          </button>
+                        )}
+                      </div>
+
                       <p className="nuance-desc">{item.meaning}</p>
 
                       {/* 원문 디폴트 예시 */}

@@ -441,6 +441,197 @@
   padding: 8px 10px;
 }
 
+/* 연결된 서재 학습 자산 섹션 (추출된 단어 · 문법 · 숙어) */
+.sentence-linked-assets-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assets-section-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.assets-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.assets-section-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.extract-assets-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  padding: 4px 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.extract-assets-btn:hover:not(:disabled) {
+  background: #d1fae5;
+  transform: translateY(-1px);
+}
+
+.extract-assets-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.asset-category-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.asset-cat-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.asset-items-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.asset-badge-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 6px 9px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.15s ease;
+  min-width: 120px;
+  flex: 1 1 calc(50% - 6px);
+  max-width: 100%;
+}
+
+.asset-badge-card.mastered {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.badge-term-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.term-text {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.badge-speak-btn {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+
+.badge-speak-btn:hover {
+  color: #059669;
+}
+
+.badge-meaning-text {
+  font-size: 11.5px;
+  color: #475569;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.badge-status-toggle {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.badge-status-toggle.learning {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.badge-status-toggle.learning:hover {
+  background: #e2e8f0;
+}
+
+.badge-status-toggle.done {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.empty-assets-box {
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.empty-assets-hint {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.sentence-toast-bubble {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f172a;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
 /* 7. 주제 태그 관리 섹션 (군더더기 없는 슬림 디자인) */
 .sentence-topic-manager {
   background: #ffffff;
