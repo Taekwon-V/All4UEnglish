@@ -376,34 +376,47 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
           onChange={(e) => setInputText(e.target.value)}
         />
 
-        {/* 문장 속 특정 단어 직접 터치하여 단어장에 추가하는 인터랙티브 칩 영역 */}
-        {inputText.trim() && (
-          <div className="interactive-words-section">
-            <div className="words-tap-header">
-              <BookOpen size={13} />
-              <span>모르는 단어를 터치하면 단어장으로 쏙 들어갑니다:</span>
+        {/* 문장 속 특정 단어 직접 터치하여 단어장에 추가하는 인터랙티브 칩 영역 (중복 단어 자동 제거) */}
+        {inputText.trim() && (() => {
+          const seen = new Set();
+          const uniqueWords = [];
+          inputText.trim().split(/\s+/).forEach(rawWord => {
+            const clean = rawWord.replace(/^[^a-zA-Z0-9'-]+|[^a-zA-Z0-9'-]+$/g, '').trim();
+            const key = clean.toLowerCase();
+            if (key && key.length >= 1 && !seen.has(key)) {
+              seen.add(key);
+              uniqueWords.push({ clean, key });
+            }
+          });
+
+          if (uniqueWords.length === 0) return null;
+
+          return (
+            <div className="interactive-words-section">
+              <div className="words-tap-header">
+                <BookOpen size={13} />
+                <span>모르는 단어를 터치하면 단어장으로 쏙 들어갑니다:</span>
+              </div>
+              <div className="words-chip-wrap">
+                {uniqueWords.map(({ clean, key }) => {
+                  const isSaved = tappedWords[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`word-tap-chip ${isSaved ? 'saved' : ''}`}
+                      onClick={() => handleTapWordInSentence(clean)}
+                      title={`'${clean}' 단어장에 추가`}
+                    >
+                      <span>{clean}</span>
+                      {isSaved && <Check size={11} className="chip-check-icon" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="words-chip-wrap">
-              {inputText.trim().split(/\s+/).map((rawWord, idx) => {
-                const clean = rawWord.replace(/^[^a-zA-Z0-9'-]+|[^a-zA-Z0-9'-]+$/g, '');
-                const wordKey = clean.toLowerCase();
-                const isSaved = tappedWords[wordKey];
-                return (
-                  <button
-                    key={`${rawWord}-${idx}`}
-                    type="button"
-                    className={`word-tap-chip ${isSaved ? 'saved' : ''}`}
-                    onClick={() => handleTapWordInSentence(rawWord)}
-                    title={`'${clean}' 단어장에 추가`}
-                  >
-                    <span>{rawWord}</span>
-                    {isSaved && <Check size={11} className="chip-check-icon" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* 단어 추가 알림 토스트 */}
         {wordToast && (

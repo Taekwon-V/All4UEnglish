@@ -77,13 +77,43 @@ export const SpeechService = {
       recognition.lang = lang; // 기본 영어 인식 (en-US)
 
       recognition.onresult = (event) => {
-        let fullTranscript = '';
+        let finalTranscript = '';
+        let latestInterim = '';
+
         for (let i = 0; i < event.results.length; ++i) {
-          const part = event.results[i][0].transcript.trim();
-          fullTranscript += (fullTranscript ? ' ' : '') + part;
+          const item = event.results[i];
+          const transcript = item[0]?.transcript?.trim() || '';
+          if (!transcript) continue;
+
+          if (item.isFinal) {
+            if (!finalTranscript) {
+              finalTranscript = transcript;
+            } else if (transcript.toLowerCase().includes(finalTranscript.toLowerCase())) {
+              finalTranscript = transcript;
+            } else if (!finalTranscript.toLowerCase().includes(transcript.toLowerCase())) {
+              finalTranscript += ' ' + transcript;
+            }
+          } else {
+            // 안드로이드 크롬은 새로운 interim 가설을 새 index로 push하므로 가장 최신 interim 채택
+            latestInterim = transcript;
+          }
         }
-        if (onResult && fullTranscript) {
-          onResult(fullTranscript);
+
+        let current = '';
+        if (finalTranscript && latestInterim) {
+          if (latestInterim.toLowerCase().includes(finalTranscript.toLowerCase())) {
+            current = latestInterim;
+          } else if (finalTranscript.toLowerCase().includes(latestInterim.toLowerCase())) {
+            current = finalTranscript;
+          } else {
+            current = finalTranscript + ' ' + latestInterim;
+          }
+        } else {
+          current = finalTranscript || latestInterim;
+        }
+
+        if (onResult && current.trim()) {
+          onResult(current.trim());
         }
       };
 
