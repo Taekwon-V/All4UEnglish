@@ -5,16 +5,40 @@
  * 3. 각 항목별 [새로운 실생활 예문 2~3개] 실시간 무한 생성
  */
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const DEFAULT_KEY_B64 = 'QVEuQWI4Uk42S3dMd1hmc3c2QXFzQ2Z6UE1EX3RZZFBwZUJxZWdNZ3JpRjJpMlZwNXRQZXc=';
+
+const getApiKey = () => {
+  const local = typeof localStorage !== 'undefined' ? localStorage.getItem('ALL4U_GEMINI_API_KEY') : null;
+  if (local && local.trim().length > 0) return local.trim();
+  if (import.meta.env.VITE_GEMINI_API_KEY && !import.meta.env.VITE_GEMINI_API_KEY.includes('YOUR_KEY')) {
+    return import.meta.env.VITE_GEMINI_API_KEY;
+  }
+  try {
+    return atob(DEFAULT_KEY_B64);
+  } catch {
+    return '';
+  }
+};
 
 export const GeminiService = {
+  getApiKey,
+  setApiKey: (key) => {
+    if (key) {
+      localStorage.setItem('ALL4U_GEMINI_API_KEY', key.trim());
+    } else {
+      localStorage.removeItem('ALL4U_GEMINI_API_KEY');
+    }
+  },
+
   /**
    * 사진(크롭된 영역)에서 영어 텍스트 및 한국어 번역 추출
    * @param {string} base64Data - 'data:image/jpeg;base64,...' 포맷
    */
   extractTextFromImage: async (base64Data) => {
-    if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_KEY')) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
       console.warn('Gemini API 키 부재: OCR 시뮬레이션 데이터 반환');
+
       return {
         text: "The secret of getting ahead is getting started.",
         translation: "앞서가는 비결은 일단 시작하는 것이다."
@@ -35,7 +59,7 @@ export const GeminiService = {
 }
 `;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,7 +99,8 @@ export const GeminiService = {
       throw new Error('문장을 입력해주세요.');
     }
 
-    if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_KEY')) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
       return GeminiService.fallbackDiscover(sentence);
     }
 
@@ -113,7 +138,7 @@ export const GeminiService = {
 `;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -148,7 +173,8 @@ export const GeminiService = {
     const detailHint = item.nuanceKo || item.explanation || item.meaning || '';
     const posHint = item.partOfSpeech ? `(품사: ${item.partOfSpeech})` : '';
 
-    if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_KEY')) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
       return GeminiService.fallbackVariations(type, targetName);
     }
 
@@ -188,7 +214,7 @@ export const GeminiService = {
 `;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
