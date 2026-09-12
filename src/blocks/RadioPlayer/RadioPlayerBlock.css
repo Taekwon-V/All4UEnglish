@@ -1,7 +1,12 @@
+/* ==========================================================================
+   RadioPlayerBlock Styles (오디오 연속 반복 라디오)
+   Target: Galaxy S26, Audio Cassette/Deck Luxury Aesthetic, Instant Control
+   ========================================================================== */
+
 .radio-container {
   display: flex;
   flex-direction: column;
-  padding: 16px 20px 30px;
+  padding: 0 4px 28px;
   gap: 16px;
   align-items: center;
   text-align: center;
@@ -10,122 +15,259 @@
   width: 100%;
 }
 
-.radio-top-selector-row {
-  width: 100%;
+/* 8번: 상단 고정 헤더 셀렉터 */
+.radio-sticky-header {
+  position: sticky;
+  top: -16px;
+  z-index: 40;
+  background: var(--bg-canvas, #faf7f2);
+  padding: 6px 0 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .radio-badge {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--primary, #059669);
+  color: var(--primary-brand, #2d6a4f);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   white-space: nowrap;
 }
 
 .playlist-dropdown {
   flex: 1;
-  max-width: 260px;
+  max-width: 280px;
   padding: 8px 12px;
   border-radius: 12px;
   border: 1px solid #cbd5e1;
   background: #ffffff;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
   color: #1e293b;
   outline: none;
   cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
+/* 모던 비주얼 오디오 덱 카드 */
 .radio-visual-deck {
   width: 100%;
-  background: linear-gradient(145deg, #ffffff, #f8fafc);
+  background: linear-gradient(160deg, #1e293b 0%, #0f172a 100%);
   border-radius: 28px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
+  box-shadow: 0 14px 32px -6px rgba(15, 23, 42, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 24px 20px;
-  gap: 12px;
+  justify-content: space-between;
+  padding: 24px 20px 22px;
+  gap: 16px;
   position: relative;
-  min-height: 200px;
+  min-height: 240px;
+  color: #ffffff;
 }
 
+.deck-disc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.spinning-disc {
+  animation: discSpin 3s linear infinite;
+  color: #34d399;
+}
+
+@keyframes discSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 웨이브폼 애니메이션 바 */
 .radio-waveform-animation {
   display: flex;
   align-items: center;
-  gap: 5px;
-  height: 28px;
+  gap: 6px;
+  height: 32px;
 }
 
 .radio-wave-bar {
   width: 4px;
-  background: #cbd5e1;
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
   height: 8px;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
 }
 
 .radio-waveform-animation.playing .radio-wave-bar {
-  background: var(--primary, #059669);
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
   animation: waveMotion 1.2s infinite ease-in-out;
 }
-.radio-waveform-animation.playing .radio-wave-bar:nth-child(2) { animation-delay: 0.2s; }
-.radio-waveform-animation.playing .radio-wave-bar:nth-child(3) { animation-delay: 0.4s; }
-.radio-waveform-animation.playing .radio-wave-bar:nth-child(4) { animation-delay: 0.6s; }
-.radio-waveform-animation.playing .radio-wave-bar:nth-child(5) { animation-delay: 0.8s; }
+.radio-waveform-animation.playing .radio-wave-bar:nth-child(1) { animation-delay: 0.1s; }
+.radio-waveform-animation.playing .radio-wave-bar:nth-child(2) { animation-delay: 0.3s; }
+.radio-waveform-animation.playing .radio-wave-bar:nth-child(3) { animation-delay: 0.5s; }
+.radio-waveform-animation.playing .radio-wave-bar:nth-child(4) { animation-delay: 0.2s; }
+.radio-waveform-animation.playing .radio-wave-bar:nth-child(5) { animation-delay: 0.4s; }
+.radio-waveform-animation.playing .radio-wave-bar:nth-child(6) { animation-delay: 0.6s; }
+.radio-waveform-animation.playing .radio-wave-bar:nth-child(7) { animation-delay: 0.3s; }
 
 @keyframes waveMotion {
-  0%, 100% { height: 8px; }
-  50% { height: 26px; }
+  0%, 100% { height: 6px; }
+  50% { height: 28px; }
+}
+
+.deck-content-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
 }
 
 .radio-track-title {
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 800;
-  color: #0f172a;
-  line-height: 1.45;
+  color: #f8fafc;
+  line-height: 1.4;
+  margin: 0;
+  letter-spacing: -0.2px;
 }
 
 .radio-track-ko {
   font-size: 13.5px;
-  color: #475569;
-  line-height: 1.4;
+  color: #cbd5e1;
+  line-height: 1.45;
+  margin: 0;
 }
 
 .track-status-pill {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   font-size: 11.5px;
   color: #94a3b8;
   margin-top: 4px;
 }
 
-.repeat-badge {
-  background: #ecfdf5;
-  color: #059669;
-  font-weight: 700;
-  padding: 2px 8px;
+.track-number-chip {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 3px 8px;
   border-radius: 6px;
+  font-weight: 600;
 }
 
-/* 옵션 패널 */
+.repeat-badge {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.empty-radio-hint {
+  color: #94a3b8;
+  font-size: 14px;
+  padding: 20px 0;
+}
+
+/* 재생 컨트롤 버튼 행 */
+.radio-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.btn-radio-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-radio-circle:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.22);
+  transform: scale(1.04);
+}
+
+.btn-radio-circle:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.btn-radio-play {
+  width: 64px;
+  height: 64px;
+  background: #10b981;
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.btn-radio-play:hover:not(:disabled) {
+  background: #059669;
+}
+
+.btn-radio-play.is-playing {
+  background: #059669;
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.6);
+}
+
+/* 12번: 옵션 제어 패널 */
 .radio-options-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.opt-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  width: 34px;
+  text-align: left;
+  flex-shrink: 0;
 }
 
 .option-pill-group {
+  flex: 1;
   display: flex;
   background: #f1f5f9;
   padding: 3px;
@@ -135,7 +277,7 @@
 
 .opt-btn {
   flex: 1;
-  padding: 7px 4px;
+  padding: 8px 4px;
   border-radius: 9px;
   border: none;
   background: transparent;
@@ -144,50 +286,11 @@
   color: #64748b;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .opt-btn.active {
   background: #ffffff;
   color: #0f172a;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-
-.radio-instruction-text {
-  margin: 0;
-  font-size: 12.5px;
-  color: #64748b;
-  line-height: 1.5;
-}
-
-/* 컨트롤러 */
-.radio-control-row {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.btn-radio-circle {
-  border: none;
-  border-radius: 50%;
-  background: #ffffff;
-  color: #1e293b;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.1s ease;
-}
-.btn-radio-circle:active {
-  transform: scale(0.95);
-}
-
-.btn-radio-play {
-  width: 64px;
-  height: 64px;
-  background: var(--primary, #059669);
-  color: #ffffff;
-  box-shadow: 0 6px 18px rgba(5, 150, 105, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }

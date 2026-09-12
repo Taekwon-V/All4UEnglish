@@ -8,13 +8,17 @@
   padding-bottom: 20px;
 }
 
-/* 3단 메인 세그먼트 바 */
+/* 3단 메인 세그먼트 바 (상단 영구 고정) */
 .section-segment-bar {
+  position: sticky;
+  top: -16px;
+  z-index: 40;
   display: flex;
-  background: #f1f5f9;
+  background: var(--bg-canvas, #faf7f2);
   padding: 4px;
   border-radius: 16px;
   gap: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 .segment-btn {
@@ -616,4 +620,134 @@
 .pl-select-item .sub {
   font-size: 11px;
   color: #94a3b8;
+}
+
+/* 생성일 배지 */
+.date-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #047857;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+
+/* 그룹핑 & 정렬 컨트롤 바 */
+.group-sort-control-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  flex-wrap: wrap;
+}
+
+.group-mode-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.control-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  margin-right: 2px;
+}
+
+.control-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.control-pill.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+.sort-selector-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.sort-dropdown {
+  border: none;
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  outline: none;
+}
+
+/* 그룹핑 섹션 & 아코디언 헤더 */
+.sentence-group-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.group-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.group-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-title-text {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.group-count-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.group-collapse-icon {
+  color: #64748b;
+  transition: transform 0.2s ease;
+}
+
+.group-collapse-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.group-cards-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }

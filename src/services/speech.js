@@ -3,10 +3,39 @@
  * 무제한 무료 브라우저 내장 음성 합성 및 인식 서비스
  */
 
+// 음성 합성 설정 키
+const VOICE_SETTINGS_KEY = 'all4u_voice_settings';
+
+export const CURATED_VOICES = [
+  { id: 'jenny', name: '제니 (Jenny)', gender: 'female', label: '👩 제니 (밝고 또렷한 여성)' },
+  { id: 'samantha', name: '사만다 (Samantha)', gender: 'female', label: '👩 사만다 (차분하고 부드러운 여성)' },
+  { id: 'guy', name: '가이 (Guy)', gender: 'male', label: '👨 가이 (자연스럽고 세련된 남성)' },
+  { id: 'alex', name: '알렉스 (Alex)', gender: 'male', label: '👨 알렉스 (깊고 신뢰감 있는 남성)' }
+];
+
 // 음성 합성 (TTS - Text to Speech)
 export const SpeechService = {
+  getSettings: () => {
+    try {
+      const saved = localStorage.getItem(VOICE_SETTINGS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { voiceId: 'jenny', rate: 1.0 };
+  },
+
+  setSettings: (settings) => {
+    try {
+      const current = SpeechService.getSettings();
+      const updated = { ...current, ...settings };
+      localStorage.setItem(VOICE_SETTINGS_KEY, JSON.stringify(updated));
+      return updated;
+    } catch {
+      return settings;
+    }
+  },
+
   // 영어 또는 한국어 문장 낭독
-  speak: (text, { lang = 'en-US', rate = 1.0, pitch = 1.0, onEnd = () => {} } = {}) => {
+  speak: (text, { lang = 'en-US', rate, pitch = 1.0, onEnd = () => {} } = {}) => {
     if (!('speechSynthesis' in window)) {
       console.warn('이 브라우저는 음성 합성을 지원하지 않습니다.');
       return;
@@ -15,19 +44,37 @@ export const SpeechService = {
     // 기존 재생 중인 음성 취소
     window.speechSynthesis.cancel();
 
+    const userSettings = SpeechService.getSettings();
+    const finalRate = rate !== undefined ? rate : (userSettings.rate || 1.0);
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
-    utterance.rate = rate; // 0.8: 슬로우 모드, 1.0: 표준 모드
+    utterance.rate = finalRate;
     utterance.pitch = pitch;
 
-    // 자연스러운 원어민(en-US) 보이스 탐색
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => 
-      v.lang.startsWith(lang.slice(0, 2)) && 
-      (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Jenny'))
-    );
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
+    if (lang.startsWith('en')) {
+      const voices = window.speechSynthesis.getVoices();
+      const targetId = userSettings.voiceId || 'jenny';
+      
+      let matchedVoice = null;
+      if (targetId === 'jenny') {
+        matchedVoice = voices.find(v => v.name.includes('Jenny') || (v.lang.startsWith('en') && v.name.includes('Female')) || v.name.includes('Samantha') || v.name.includes('Google US English'));
+      } else if (targetId === 'samantha') {
+        matchedVoice = voices.find(v => v.name.includes('Samantha') || v.name.includes('Victoria') || v.name.includes('Zira') || (v.lang.startsWith('en') && !v.name.includes('Male')));
+      } else if (targetId === 'guy') {
+        matchedVoice = voices.find(v => v.name.includes('Guy') || (v.lang.startsWith('en') && v.name.includes('Male')) || v.name.includes('David'));
+      } else if (targetId === 'alex') {
+        matchedVoice = voices.find(v => v.name.includes('Alex') || v.name.includes('George') || (v.lang.startsWith('en') && (v.name.includes('Male') || v.name.includes('David'))));
+      }
+
+      // fallback
+      if (!matchedVoice) {
+        matchedVoice = voices.find(v => v.lang.startsWith('en-US') || v.lang.startsWith('en'));
+      }
+
+      if (matchedVoice) {
+        utterance.voice = matchedVoice;
+      }
     }
 
     utterance.onend = onEnd;

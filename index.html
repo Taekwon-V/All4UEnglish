@@ -23,7 +23,7 @@
         if (/KAKAOTALK/i.test(userAgent)) {
           if (/Android/i.test(userAgent)) {
             var cleanUrl = location.href.replace(/^https?:\/\//i, '');
-            location.href = 'intent://' + cleanUrl + '#Intent;scheme=https;package=com.android.chrome;end';
+            location.href = 'intent://' + cleanUrl + '#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
           } else if (/iPhone|iPad|iPod/i.test(userAgent)) {
             location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href);
           }

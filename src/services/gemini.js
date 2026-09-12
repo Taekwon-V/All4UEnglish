@@ -137,8 +137,9 @@ export const GeminiService = {
     {
       "word": "단어 원형",
       "phonetic": "[발음기호]",
-      "partOfSpeech": "품사",
-      "nuanceKo": "단순 사전 뜻이 아닌 이 문맥 속 뉘앙스 해설"
+      "partOfSpeech": "동사 / 명사 / 형용사 / 부사 등 품사 명시",
+      "dictionaryMeanings": ["1. 사전적 대표 뜻1", "2. 사전적 대표 뜻2", "3. 사전적 대표 뜻3"],
+      "nuanceKo": "단순 사전 뜻이 아닌 이 문맥 속 생생한 뉘앙스 해설"
     }
   ],
   "suggestedGrammar": {

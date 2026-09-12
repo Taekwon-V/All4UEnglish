@@ -1,11 +1,29 @@
+/* ==========================================================================
+   StudyLibrary Styles (단어장 / 문법장 / 숙어장)
+   Target: Galaxy S26, Accordion List UX, Sticky Header & Minimal Scroll
+   ========================================================================== */
+
 .study-library-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   width: 100%;
   max-width: 520px;
   margin: 0 auto;
   padding-bottom: 30px;
+}
+
+/* 상단 고정 헤더 영역 (탭 + 검색 & 정렬 컨트롤) */
+.library-sticky-header {
+  position: sticky;
+  top: -16px;
+  z-index: 40;
+  background: var(--bg-canvas, #faf7f2);
+  padding: 6px 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 /* 3단 상단 탭 */
@@ -15,6 +33,7 @@
   padding: 4px;
   border-radius: 16px;
   gap: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
 .lib-tab {
@@ -40,115 +59,319 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-/* 검색 바 */
+/* 검색 & 정렬 컨트롤 행 */
+.library-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .library-search-bar {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  padding: 10px 14px;
+  padding: 8px 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .search-icon {
   color: #94a3b8;
+  flex-shrink: 0;
 }
 
 .library-search-bar input {
-  flex: 1;
+  width: 100%;
   border: none;
-  font-size: 14px;
+  font-size: 13px;
   color: #1e293b;
   outline: none;
+  background: transparent;
 }
 
-/* 카드 목록 */
-.card-list-section {
+.library-sort-wrapper {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.library-card {
+  align-items: center;
+  gap: 4px;
   background: #ffffff;
-  border-radius: 20px;
-  padding: 18px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
   border: 1px solid #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  border-radius: 14px;
+  padding: 0 10px;
+  height: 38px;
+  flex-shrink: 0;
 }
 
-.card-top-row {
+.sort-icon {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.library-sort-select {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  outline: none;
+  cursor: pointer;
+  padding-right: 2px;
+}
+
+/* 아코디언 카드 목록 */
+.accordion-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.library-empty-box {
+  text-align: center;
+  padding: 40px 20px;
+  color: #94a3b8;
+  font-size: 14px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px dashed #cbd5e1;
+}
+
+.accordion-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.accordion-card.is-open {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+/* 접힌 기본 행 (클릭 시 펼침) */
+.accordion-header-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
+  padding: 12px 14px;
+  cursor: pointer;
+  background: #ffffff;
+  user-select: none;
+  transition: background 0.15s ease;
+  gap: 8px;
 }
 
-.main-term {
+.accordion-header-row:hover {
+  background: #f8fafc;
+}
+
+.header-left {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 
-.main-term h3 {
-  margin: 0;
-  font-size: 19px;
-  font-weight: 800;
-  color: #0f172a;
+.part-badge, .pattern-badge, .idiom-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
 }
 
 .part-badge {
-  display: inline-block;
-  align-self: flex-start;
-  font-size: 11px;
-  font-weight: 700;
   background: #e0f2fe;
   color: #0369a1;
-  padding: 2px 6px;
-  border-radius: 6px;
 }
 
 .pattern-badge {
-  display: inline-block;
-  align-self: flex-start;
-  font-size: 11px;
-  font-weight: 700;
   background: #f5f3ff;
   color: #6d28d9;
-  padding: 2px 6px;
-  border-radius: 6px;
 }
 
 .idiom-badge {
-  display: inline-block;
-  align-self: flex-start;
-  font-size: 11px;
-  font-weight: 700;
   background: #fef3c7;
   color: #b45309;
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  flex-shrink: 0;
+}
+
+.header-preview {
+  font-size: 12.5px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.meta-date-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: #94a3b8;
+  background: #f1f5f9;
   padding: 2px 6px;
   border-radius: 6px;
+  font-weight: 600;
 }
 
-.phonetic {
-  font-size: 12.5px;
-  color: #94a3b8;
-}
-
-.tts-icon-btn {
+.tts-mini-icon-btn, .delete-mini-btn {
   background: #f1f5f9;
   border: none;
-  color: #0284c7;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tts-mini-icon-btn {
+  color: #0284c7;
+}
+.tts-mini-icon-btn:hover {
+  background: #e0f2fe;
+}
+
+.delete-mini-btn {
+  color: #94a3b8;
+}
+.delete-mini-btn:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.accordion-chevron {
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  margin-left: 2px;
+}
+
+/* 펼쳐진 상세 바디 */
+.accordion-body-content {
+  border-top: 1px solid #f1f5f9;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #ffffff;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.expanded-top-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.phonetic {
+  font-size: 13px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+/* 13번: 사전적 대표 의미 컨테이너 */
+.dict-meanings-container {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dict-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dict-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.dict-pos-tag {
+  font-size: 11px;
+  font-weight: 800;
+  color: #0284c7;
+  background: #e0f2fe;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.dict-meaning-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dict-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #1e293b;
+}
+
+.pill-idx {
+  font-weight: 800;
+  color: #0284c7;
+  font-size: 11px;
+}
+
+.pill-text {
+  font-weight: 600;
+}
+
+/* 뉘앙스 & 설명 박스 */
+.nuance-info-box {
+  background: #fffbeb;
+  border-left: 3px solid #f59e0b;
+  border-radius: 0 10px 10px 0;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nuance-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
 }
 
 .nuance-desc, .explanation-desc {
@@ -196,6 +419,11 @@
   font-weight: 700;
   color: #334155;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mini-speak-btn:hover {
+  background: #cbd5e1;
 }
 
 /* AI 예문 생성 섹션 */
@@ -233,9 +461,11 @@
   cursor: pointer;
   transition: all 0.15s ease;
 }
+
 .gen-variations-btn:hover:not(:disabled) {
   background: #d1fae5;
 }
+
 .gen-variations-btn:disabled {
   opacity: 0.6;
   cursor: wait;
@@ -300,9 +530,9 @@
 }
 
 .save-to-sentence-btn:hover:not(:disabled) {
-  background: var(--primary, #059669);
+  background: var(--primary-brand, #2d6a4f);
   color: #ffffff;
-  border-color: var(--primary, #059669);
+  border-color: var(--primary-brand, #2d6a4f);
 }
 
 .save-to-sentence-btn.saved {
@@ -316,11 +546,11 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 24px 16px;
+  padding: 20px 16px;
   background: rgba(236, 253, 245, 0.6);
   border: 1px dashed #a7f3d0;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   color: #059669;
 }
@@ -333,4 +563,3 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
-

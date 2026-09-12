@@ -1,16 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Award, CheckCircle, HelpCircle, RotateCcw, Sparkles, Volume2 } from 'lucide-react';
+import { Award, CheckCircle, HelpCircle, RotateCcw, Sparkles, Volume2, ArrowRight, RotateCw } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { StorageService } from '../../services/storage';
 import { SpeechService } from '../../services/speech';
 import './RetentionTest.css';
 
 export default function RetentionTest() {
-  const [testCategory, setTestCategory] = useState('words'); // 'words' | 'sentences' | 'idioms'
+  const [testCategory, setTestCategory] = useState('sentences'); // 'sentences' | 'idioms' | 'words'
   const [questions, setQuestions] = useState([]);
   const [currentQIdx, setCurrentQIdx] = useState(0);
+
+  // 단어 객관식 상태
   const [selectedOption, setSelectedOption] = useState(null);
+
+  // 문장/숙어 순서 배열 상태
+  const [availableChips, setAvailableChips] = useState([]);
+  const [assembledChips, setAssembledChips] = useState([]);
+
   const [isAnswered, setIsAnswered] = useState(false);
+  const [isCurrentCorrect, setIsCurrentCorrect] = useState(false);
   const [score, setScore] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -46,63 +54,149 @@ export default function RetentionTest() {
           .map(x => x.word)
           .sort(() => 0.5 - Math.random())
           .slice(0, 3);
+
+        while (distractors.length < 3) {
+          distractors.push(`선택지 ${distractors.length + 2}`);
+        }
+
+        const options = [correct, ...distractors].sort(() => 0.5 - Math.random());
+        return {
+          id: `q-${idx}`,
+          category: 'words',
+          type: 'choice',
+          prompt: promptText,
+          correct,
+          options
+        };
       } else if (category === 'sentences') {
-        promptText = item.translation || '다음 우리말에 맞는 영어 문장을 고르세요.';
+        promptText = item.translation || '다음 우리말에 맞는 영어 문장을 순서대로 완성하세요.';
         correct = item.text;
-        distractors = rawItems
-          .filter(x => x.text !== correct)
-          .map(x => x.text)
-          .sort(() => 0.5 - Math.random())
-          .slice(0, 3);
+        
+        // 단어 토큰 분리
+        const tokens = correct.trim().split(/\s+/).filter(Boolean).map((word, wIdx) => ({
+          id: `token-${wIdx}-${word}`,
+          word
+        }));
+        const scrambled = [...tokens].sort(() => 0.5 - Math.random());
+
+        return {
+          id: `q-${idx}`,
+          category: 'sentences',
+          type: 'scramble',
+          prompt: promptText,
+          correct,
+          tokens: scrambled
+        };
       } else {
-        promptText = item.meaning || '다음 뜻에 해당하는 숙어는?';
+        // 숙어 암기: 순서 배열하기
+        promptText = item.meaning || '다음 뜻에 맞는 영어 숙어를 순서대로 완성하세요.';
         correct = item.idiom;
-        distractors = rawItems
-          .filter(x => x.idiom !== correct)
-          .map(x => x.idiom)
-          .sort(() => 0.5 - Math.random())
-          .slice(0, 3);
+
+        const tokens = correct.trim().split(/\s+/).filter(Boolean).map((word, wIdx) => ({
+          id: `token-${wIdx}-${word}`,
+          word
+        }));
+        const scrambled = [...tokens].sort(() => 0.5 - Math.random());
+
+        return {
+          id: `q-${idx}`,
+          category: 'idioms',
+          type: 'scramble',
+          prompt: promptText,
+          correct,
+          tokens: scrambled
+        };
       }
-
-      // 4지선다 보기 구성 (더미가 부족할 경우 기본 보기 채우기)
-      while (distractors.length < 3) {
-        distractors.push(`선택지 ${distractors.length + 2}`);
-      }
-
-      const options = [correct, ...distractors].sort(() => 0.5 - Math.random());
-
-      return {
-        id: `q-${idx}`,
-        prompt: promptText,
-        originalSentence: item.originalSentence || item.text || '',
-        correct,
-        options
-      };
     });
 
     setQuestions(builtQuestions);
     setCurrentQIdx(0);
     setSelectedOption(null);
     setIsAnswered(false);
+    setIsCurrentCorrect(false);
     setScore(0);
     setIsCompleted(false);
+
+    if (builtQuestions.length > 0 && builtQuestions[0].type === 'scramble') {
+      setAvailableChips(builtQuestions[0].tokens);
+      setAssembledChips([]);
+    }
   };
 
   useEffect(() => {
     generateQuiz(testCategory);
   }, [testCategory]);
 
+  // 문제 바뀔 때 토큰 초기화
+  useEffect(() => {
+    const q = questions[currentQIdx];
+    if (q && q.type === 'scramble') {
+      setAvailableChips(q.tokens);
+      setAssembledChips([]);
+      setSelectedOption(null);
+      setIsAnswered(false);
+      setIsCurrentCorrect(false);
+    }
+  }, [currentQIdx, questions]);
+
+  // 단어 객관식 정답 선택
   const handleSelectOption = (option) => {
     if (isAnswered) return;
     setSelectedOption(option);
     setIsAnswered(true);
 
     const q = questions[currentQIdx];
-    if (option === q.correct) {
+    const isCorrect = option === q.correct;
+    setIsCurrentCorrect(isCorrect);
+    if (isCorrect) {
       setScore(prev => prev + 1);
-      SpeechService.speak('Correct!', 1.2);
+      SpeechService.speak('Correct!', { lang: 'en-US', rate: 1.1 });
     } else {
-      SpeechService.speak('Check again', 1.2);
+      SpeechService.speak('Check again', { lang: 'en-US', rate: 1.1 });
+    }
+  };
+
+  // 순서 배열: 칩 추가 (대기열 -> 조립 영역)
+  const handlePickChip = (chip) => {
+    if (isAnswered) return;
+    setAvailableChips(prev => prev.filter(c => c.id !== chip.id));
+    setAssembledChips(prev => [...prev, chip]);
+  };
+
+  // 순서 배열: 칩 제거 (조립 영역 -> 대기열)
+  const handleRemoveChip = (chip) => {
+    if (isAnswered) return;
+    setAssembledChips(prev => prev.filter(c => c.id !== chip.id));
+    setAvailableChips(prev => [...prev, chip]);
+  };
+
+  // 순서 배열: 전체 초기화
+  const handleResetChips = () => {
+    if (isAnswered) return;
+    const q = questions[currentQIdx];
+    if (q && q.tokens) {
+      setAvailableChips(q.tokens);
+      setAssembledChips([]);
+    }
+  };
+
+  // 순서 배열: 정답 확인
+  const handleCheckScrambleAnswer = () => {
+    if (isAnswered || assembledChips.length === 0) return;
+    const q = questions[currentQIdx];
+
+    const assembledText = assembledChips.map(c => c.word).join(' ');
+    const normalize = str => str.replace(/[.,!?'"~;:()]/g, '').trim().toLowerCase();
+    const isCorrect = normalize(assembledText) === normalize(q.correct);
+
+    setIsAnswered(true);
+    setIsCurrentCorrect(isCorrect);
+
+    if (isCorrect) {
+      setScore(prev => prev + 1);
+      SpeechService.speak(q.correct, { lang: 'en-US', rate: 1.0 });
+    } else {
+      SpeechService.speak(q.correct, { lang: 'en-US', rate: 1.0 });
     }
   };
 
@@ -111,6 +205,7 @@ export default function RetentionTest() {
       setCurrentQIdx(prev => prev + 1);
       setSelectedOption(null);
       setIsAnswered(false);
+      setIsCurrentCorrect(false);
     } else {
       setIsCompleted(true);
       confetti({
@@ -125,28 +220,28 @@ export default function RetentionTest() {
 
   return (
     <div className="retention-test-container">
-      {/* 상단 카테고리 선택 */}
+      {/* 8번 요구사항: 상단 고정 카테고리 탭 */}
       <div className="test-category-tabs">
-        <button 
-          type="button" 
-          className={`test-tab ${testCategory === 'words' ? 'active' : ''}`}
-          onClick={() => setTestCategory('words')}
-        >
-          단어 암기
-        </button>
         <button 
           type="button" 
           className={`test-tab ${testCategory === 'sentences' ? 'active' : ''}`}
           onClick={() => setTestCategory('sentences')}
         >
-          문장 암기
+          🧩 문장 순서배열
         </button>
         <button 
           type="button" 
           className={`test-tab ${testCategory === 'idioms' ? 'active' : ''}`}
           onClick={() => setTestCategory('idioms')}
         >
-          숙어 암기
+          🧩 숙어 순서배열
+        </button>
+        <button 
+          type="button" 
+          className={`test-tab ${testCategory === 'words' ? 'active' : ''}`}
+          onClick={() => setTestCategory('words')}
+        >
+          📝 단어 암기
         </button>
       </div>
 
@@ -187,41 +282,125 @@ export default function RetentionTest() {
           </div>
 
           <div className="question-prompt-box">
-            <p className="q-guide">다음 뜻/상황에 알맞은 올바른 표현을 고르세요:</p>
+            <p className="q-guide">
+              {currentQ.type === 'scramble' 
+                ? '아래 우리말 의미에 맞게 영어 단어 블록을 순서대로 배열해 보세요:'
+                : '다음 뜻에 알맞은 올바른 영어 단어를 고르세요:'}
+            </p>
             <h3 className="q-text">{currentQ.prompt}</h3>
           </div>
 
-          {/* 4지선다 옵션 리스트 */}
-          <div className="options-grid">
-            {currentQ.options.map((opt, i) => {
-              let optClass = 'option-btn';
-              if (isAnswered) {
-                if (opt === currentQ.correct) optClass += ' correct';
-                else if (opt === selectedOption) optClass += ' wrong';
-              }
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  className={optClass}
-                  onClick={() => handleSelectOption(opt)}
-                >
-                  <span className="opt-num">{i + 1}</span>
-                  <span className="opt-text">{opt}</span>
-                </button>
-              );
-            })}
-          </div>
+          {/* ================= 14, 15번: 순서 배열하기 (Scramble Mode) ================= */}
+          {currentQ.type === 'scramble' && (
+            <div className="scramble-workspace">
+              {/* 조립된 문장 영역 */}
+              <div className={`assembled-box ${isAnswered ? (isCurrentCorrect ? 'correct' : 'wrong') : ''}`}>
+                <div className="assembled-box-header">
+                  <span className="assembled-label">내가 배열한 문장</span>
+                  {!isAnswered && assembledChips.length > 0 && (
+                    <button type="button" className="reset-chips-btn" onClick={handleResetChips}>
+                      <RotateCw size={12} /> <span>초기화</span>
+                    </button>
+                  )}
+                </div>
 
-          {/* 피드백 & 다음 버튼 */}
+                <div className="assembled-chips-wrap">
+                  {assembledChips.length === 0 ? (
+                    <span className="chips-placeholder">아래 단어 카드를 터치하여 문장을 완성하세요</span>
+                  ) : (
+                    assembledChips.map((chip, idx) => (
+                      <button
+                        key={chip.id}
+                        type="button"
+                        className="chip-btn assembled"
+                        onClick={() => handleRemoveChip(chip)}
+                        disabled={isAnswered}
+                      >
+                        <span>{chip.word}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* 선택 가능한 단어 풀 (대기열) */}
+              {!isAnswered && (
+                <div className="available-chips-section">
+                  <span className="available-label">터치하여 순서대로 넣기:</span>
+                  <div className="available-chips-wrap">
+                    {availableChips.map((chip) => (
+                      <button
+                        key={chip.id}
+                        type="button"
+                        className="chip-btn available btn-spring"
+                        onClick={() => handlePickChip(chip)}
+                      >
+                        <span>{chip.word}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 정답 확인 버튼 */}
+                  <button
+                    type="button"
+                    className="check-scramble-btn"
+                    disabled={assembledChips.length === 0}
+                    onClick={handleCheckScrambleAnswer}
+                  >
+                    <span>정답 확인하기 ({assembledChips.length}개 배열됨)</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================= 단어 객관식 4지선다 리스트 ================= */}
+          {currentQ.type === 'choice' && (
+            <div className="options-grid">
+              {currentQ.options.map((opt, i) => {
+                let optClass = 'option-btn';
+                if (isAnswered) {
+                  if (opt === currentQ.correct) optClass += ' correct';
+                  else if (opt === selectedOption) optClass += ' wrong';
+                }
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    className={optClass}
+                    onClick={() => handleSelectOption(opt)}
+                  >
+                    <span className="opt-num">{i + 1}</span>
+                    <span className="opt-text">{opt}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ================= 채점 피드백 및 다음 문제 버튼 ================= */}
           {isAnswered && (
-            <div className="answer-feedback-box">
+            <div className="answer-feedback-box animate-pop">
               <div className="feedback-result">
-                {selectedOption === currentQ.correct ? (
-                  <span className="correct-label">정답입니다! 👏</span>
+                {isCurrentCorrect ? (
+                  <div className="feedback-correct-row">
+                    <CheckCircle size={20} className="text-emerald" />
+                    <span className="correct-label">정답입니다! 완벽해요! 👏</span>
+                  </div>
                 ) : (
-                  <span className="wrong-label">아쉬워요! 정답은: {currentQ.correct}</span>
+                  <div className="feedback-wrong-row">
+                    <span className="wrong-label">아쉬워요! 올바른 문장:</span>
+                    <strong className="correct-sentence-view">{currentQ.correct}</strong>
+                  </div>
                 )}
+
+                <button 
+                  type="button" 
+                  className="listen-correct-btn"
+                  onClick={() => SpeechService.speak(currentQ.correct, { lang: 'en-US', rate: 1.0 })}
+                >
+                  <Volume2 size={14} /> <span>정답 발음 듣기</span>
+                </button>
               </div>
 
               <button 
@@ -229,7 +408,8 @@ export default function RetentionTest() {
                 className="next-q-btn"
                 onClick={handleNextQuestion}
               >
-                <span>{currentQIdx + 1 === questions.length ? '결과 보기' : '다음 문제'}</span>
+                <span>{currentQIdx + 1 === questions.length ? '최종 결과 보기' : '다음 문제로'}</span>
+                <ArrowRight size={16} />
               </button>
             </div>
           )}

@@ -21,114 +21,91 @@
   letter-spacing: -0.4px;
 }
 
-/* 3대 모드 탭 */
-.mode-selector {
+/* 빠른 3대 액션 버튼 바 */
+.input-quick-actions-bar {
   display: flex;
-  background: #f1f5f9;
-  padding: 3px;
-  border-radius: 14px;
-  gap: 3px;
+  gap: 8px;
+  width: 100%;
 }
 
-.mode-tab {
+.quick-action-pill {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 8px 4px;
-  border-radius: 11px;
-  border: none;
-  background: transparent;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #64748b;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.mode-tab.active {
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
   background: #ffffff;
-  color: var(--primary, #059669);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-}
-
-/* 컴팩트 카메라 트리거 버튼 */
-.compact-camera-trigger {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
-  border: 1.5px dashed #a7f3d0;
-  border-radius: 14px;
-  padding: 12px 16px;
-  color: #065f46;
-  font-size: 13.5px;
+  color: #334155;
+  font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease;
-}
-.compact-camera-trigger:hover {
-  border-color: #059669;
-  background: #ecfdf5;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: all 0.18s ease;
 }
 
-/* 컴팩트 마이크 박스 & 컨트롤 */
+.quick-action-pill:hover {
+  transform: translateY(-1px);
+}
+
+.quick-action-pill.camera {
+  color: #047857;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.quick-action-pill.album {
+  color: #0369a1;
+  background: #f0f9ff;
+  border-color: #bae6fd;
+}
+
+.quick-action-pill.mic {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.quick-action-pill.mic.listening {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+/* 마이크 제어 박스 & 완벽히 일치하는 버튼 규격 */
 .compact-mic-box {
   display: flex;
   justify-content: center;
   width: 100%;
 }
 
-.mic-active-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  background: #fef2f2;
-  border: 1.5px solid #fecaca;
-  border-radius: 16px;
-  padding: 12px 16px;
-}
-
-.mic-recording-pulse {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .rec-dot {
   width: 10px;
   height: 10px;
-  background: #ef4444;
+  background: #ffffff;
   border-radius: 50%;
-  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
   animation: pulse-dot 1.2s infinite;
 }
 
 @keyframes pulse-dot {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-  70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-
-.rec-text {
-  font-size: 13px;
-  font-weight: 700;
-  color: #b91c1c;
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(255, 255, 255, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
 }
 
 .mic-action-btn {
+  width: 100%;
+  height: 48px; /* 시작/종료 버튼 높이 완전히 동일하게 고정 */
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 22px;
-  padding: 11px 22px;
-  font-size: 13.5px;
+  border-radius: 14px;
+  padding: 0 20px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   border: none;
@@ -136,7 +113,6 @@
 }
 
 .mic-action-btn.start {
-  width: 100%;
   background: linear-gradient(135deg, #059669 0%, #10b981 100%);
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
@@ -148,14 +124,14 @@
 }
 
 .mic-action-btn.stop {
-  background: #dc2626;
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
   color: #ffffff;
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
 }
 
 .mic-action-btn.stop:hover {
-  background: #b91c1c;
-  transform: scale(1.02);
+  opacity: 0.95;
+  transform: translateY(-1px);
 }
 
 /* 문장 에디터 카드 */

@@ -33,8 +33,11 @@ import {
   X, 
   CheckCircle,
   Shield,
-  FolderLock
+  FolderLock,
+  Settings,
+  Volume2
 } from 'lucide-react';
+import { SpeechService, CURATED_VOICES } from './services/speech';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -54,6 +57,26 @@ export default function App() {
   const [whitelistEmails, setWhitelistEmails] = useState([]);
   const [newEmailInput, setNewEmailInput] = useState('');
   const [whitelistLoading, setWhitelistLoading] = useState(false);
+
+  // 음성 및 발음 설정 모달 상태
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [voiceSettings, setVoiceSettings] = useState(() => SpeechService.getSettings());
+
+  const handleUpdateVoice = (voiceId) => {
+    const updated = SpeechService.setSettings({ voiceId });
+    setVoiceSettings(updated);
+  };
+
+  const handleUpdateRate = (rate) => {
+    const updated = SpeechService.setSettings({ rate });
+    setVoiceSettings(updated);
+  };
+
+  const handleTestVoice = () => {
+    SpeechService.speak("Hello! This is your personal English AI tutor.", {
+      rate: voiceSettings.rate
+    });
+  };
 
   // 1. 세션 체크 및 Firebase Auth 상태 감지
   useEffect(() => {
@@ -206,13 +229,9 @@ export default function App() {
     <div className="mobile-app-shell">
       {/* 상단 영구 고정 헤더 */}
       <header className="app-fixed-header">
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontFamily: 'inherit', fontSize: '17px', fontWeight: 800, color: 'var(--text-headline, #0f172a)', lineHeight: 1.1 }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <span style={{ fontFamily: 'inherit', fontSize: '18px', fontWeight: 800, color: 'var(--text-headline, #0f172a)', letterSpacing: '-0.3px' }}>
             All<span style={{ color: 'var(--primary, #059669)' }}>4U</span>English
-          </span>
-          <span style={{ fontSize: '11px', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
-            {currentUser.spaceName || (currentUser.isAdmin ? '마스터 메인 공간' : '내 학습공간')}
           </span>
         </div>
 
@@ -245,20 +264,34 @@ export default function App() {
             </button>
           )}
 
-          {/* 연속 학습 스트릭 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fef3c7', color: '#b45309', padding: '4px 8px', borderRadius: '10px', fontSize: '11.5px', fontWeight: 700 }}>
-            <Flame size={13} fill="currentColor" />
-            <span>7일</span>
-          </div>
+          {/* 발음 목소리 & 속도 설정 톱니바퀴 버튼 */}
+          <button
+            type="button"
+            onClick={() => setIsSettingsModalOpen(true)}
+            title="발음 목소리 및 속도 설정"
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              color: '#334155',
+              cursor: 'pointer',
+              padding: '6px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <Settings size={17} />
+          </button>
 
           {/* 로그아웃 버튼 */}
           <button
             type="button"
             onClick={handleLogout}
             title="로그아웃"
-            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center' }}
           >
-            <LogOut size={16} />
+            <LogOut size={17} />
           </button>
         </div>
       </header>
@@ -554,6 +587,159 @@ export default function App() {
             >
               닫기
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          원어민 발음 목소리 & 속도 설정 모달
+          ========================================================================= */}
+      {isSettingsModalOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.7)',
+          backdropFilter: 'blur(6px)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '20px',
+            width: '100%',
+            maxWidth: '380px',
+            padding: '24px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ background: '#ecfdf5', padding: '7px', borderRadius: '10px', color: '#059669', display: 'flex' }}>
+                  <Settings size={18} />
+                </div>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>발음 목소리 & 속도 설정</h3>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setIsSettingsModalOpen(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* 1. 보이스 선택 (여성 2명, 남성 2명 총 4종) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#475569' }}>원어민 보이스 선택 (4종)</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {CURATED_VOICES.map((v) => {
+                  const isSelected = voiceSettings.voiceId === v.id;
+                  return (
+                    <div
+                      key={v.id}
+                      onClick={() => handleUpdateVoice(v.id)}
+                      style={{
+                        padding: '11px 14px',
+                        borderRadius: '12px',
+                        border: isSelected ? '2px solid #059669' : '1.5px solid #e2e8f0',
+                        background: isSelected ? '#f0fdf4' : '#f8fafc',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span style={{ fontSize: '13.5px', fontWeight: isSelected ? 700 : 500, color: isSelected ? '#065f46' : '#334155' }}>
+                        {v.label}
+                      </span>
+                      {isSelected && <CheckCircle size={16} color="#059669" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2. 발음 듣기 속도 조절 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#475569' }}>발음 속도</span>
+                <span style={{ fontSize: '13px', fontWeight: 800, color: '#059669' }}>
+                  {voiceSettings.rate}x {voiceSettings.rate === 1.0 ? '(표준)' : voiceSettings.rate < 1.0 ? '(슬로우)' : '(빠르게)'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {[0.8, 0.9, 1.0, 1.1, 1.2].map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => handleUpdateRate(r)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 0',
+                      borderRadius: '8px',
+                      border: voiceSettings.rate === r ? '2px solid #059669' : '1px solid #cbd5e1',
+                      background: voiceSettings.rate === r ? '#059669' : '#f8fafc',
+                      color: voiceSettings.rate === r ? '#ffffff' : '#475569',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {r}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. 미리듣기 & 완료 버튼 */}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={handleTestVoice}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: '#f1f5f9',
+                  color: '#334155',
+                  border: 'none',
+                  fontSize: '13.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <Volume2 size={16} />
+                <span>미리듣기</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSettingsModalOpen(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: '#059669',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '13.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                설정 완료
+              </button>
+            </div>
           </div>
         </div>
       )}

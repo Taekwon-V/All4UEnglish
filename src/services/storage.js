@@ -438,6 +438,13 @@ export const StorageService = {
     return list;
   },
 
+  deleteGrammar: (grammarId) => {
+    const list = StorageService.getGrammar().filter(g => g.id !== grammarId);
+    localStorage.setItem(STORAGE_KEYS.GRAMMAR, JSON.stringify(list));
+    deleteFromFirestore('grammar', grammarId);
+    return list;
+  },
+
   // ================= 3. 숙어장 (Idioms) =================
   getIdioms: () => {
     try {
@@ -510,6 +517,13 @@ export const StorageService = {
     });
     localStorage.setItem(STORAGE_KEYS.IDIOMS, JSON.stringify(list));
     if (changed) syncToFirestore('idioms', changed.id, changed);
+    return list;
+  },
+
+  deleteIdiom: (idiomId) => {
+    const list = StorageService.getIdioms().filter(i => i.id !== idiomId);
+    localStorage.setItem(STORAGE_KEYS.IDIOMS, JSON.stringify(list));
+    deleteFromFirestore('idioms', idiomId);
     return list;
   },
 
@@ -621,6 +635,13 @@ export const StorageService = {
     localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(words));
     if (changed) syncToFirestore('words', changed.id, changed);
     return words;
+  },
+
+  deleteWord: (wordId) => {
+    const list = StorageService.getWords().filter(w => w.id !== wordId);
+    localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(list));
+    deleteFromFirestore('words', wordId);
+    return list;
   },
 
   // ================= 5. 플레이리스트 (Playlists) =================

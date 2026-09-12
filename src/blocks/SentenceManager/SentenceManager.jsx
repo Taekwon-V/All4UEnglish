@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ListOrdered, PlayCircle, Plus, Bookmark, Volume2, 
   Trash2, FolderPlus, Check, ChevronRight, Headphones, 
-  CheckCircle2, RotateCcw, Search, Sparkles, Filter, BookOpen 
+  CheckCircle2, RotateCcw, Search, Sparkles, Filter, BookOpen,
+  Calendar, Tag, ChevronDown, ArrowUpDown
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { SpeechService } from '../../services/speech';
@@ -17,7 +18,12 @@ export default function SentenceManager({ onPlayPlaylist }) {
   
   // 검색 및 필터 칩
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTag, setSelectedTag] = useState('all'); // 'all' | 'bookmarked' | '책/원서' | '일상회화'
+  const [selectedTag, setSelectedTag] = useState('all'); // 'all' | 'bookmarked' | '책' | '일상'
+
+  // 그룹핑 & 정렬 상태
+  const [groupMode, setGroupMode] = useState('date'); // 'date' | 'tag' | 'none'
+  const [sortBy, setSortBy] = useState('latest'); // 'latest' | 'oldest' | 'alpha' | 'bookmark'
+  const [collapsedGroups, setCollapsedGroups] = useState({});
 
   // 플레이리스트 생성 모달
   const [isCreatingPl, setIsCreatingPl] = useState(false);
@@ -65,6 +71,79 @@ export default function SentenceManager({ onPlayPlaylist }) {
       return matchSearch && matchTag;
     });
   }, [activeSection, learningSentences, masteredSentences, searchQuery, selectedTag]);
+
+  // 날짜 포맷팅 헬퍼 (YYYY.MM.DD)
+  const formatDate = (isoString) => {
+    if (!isoString) return '최근 담음';
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '최근 담음';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}.${m}.${day}`;
+  };
+
+  // 날짜별 그룹 키 생성 헬퍼
+  const getDateGroupKey = (isoString) => {
+    if (!isoString) return '이전 보관 문장';
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '이전 보관 문장';
+    const now = new Date();
+    
+    if (d.toDateString() === now.toDateString()) return '오늘 담은 문장 🌟';
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return '어제 담은 문장 🌤️';
+
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    return `${y}년 ${m}월`;
+  };
+
+  // 정렬 적용된 목록 (최신순 / 오래된순 / 알파벳순 / 북마크우선순)
+  const sortedSentences = useMemo(() => {
+    const list = [...displayedSentences];
+    if (sortBy === 'latest') {
+      return list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+    if (sortBy === 'oldest') {
+      return list.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    }
+    if (sortBy === 'alpha') {
+      return list.sort((a, b) => a.text.localeCompare(b.text));
+    }
+    if (sortBy === 'bookmark') {
+      return list.sort((a, b) => (b.isBookmarked ? 1 : 0) - (a.isBookmarked ? 1 : 0));
+    }
+    return list;
+  }, [displayedSentences, sortBy]);
+
+  // 그룹핑 계층화 데이터 (날짜별 / 주제별 / 전체)
+  const groupedData = useMemo(() => {
+    if (groupMode === 'none') {
+      return [{ key: 'all', title: null, items: sortedSentences }];
+    }
+    
+    const map = {};
+    sortedSentences.forEach(s => {
+      let key = '';
+      if (groupMode === 'date') {
+        key = getDateGroupKey(s.createdAt);
+      } else if (groupMode === 'tag') {
+        const primaryTag = (s.tags && s.tags[0]) || '일반';
+        key = primaryTag.startsWith('#') ? primaryTag : `#${primaryTag}`;
+      }
+      if (!map[key]) map[key] = [];
+      map[key].push(s);
+    });
+
+    return Object.keys(map).map(key => ({
+      key,
+      title: key,
+      items: map[key]
+    }));
+  }, [sortedSentences, groupMode]);
 
   const handleSpeak = (text) => {
     SpeechService.speak(text, 1.0);
@@ -188,29 +267,6 @@ export default function SentenceManager({ onPlayPlaylist }) {
       {/* 1. 학습 중 탭 또는 학습 완료 탭 화면 */}
       {(activeSection === 'learning' || activeSection === 'mastered') && (
         <div className="sentences-tab-content">
-          {/* 학습 중 탭 전용: 원클릭 라디오 연속 듣기 CTA 카드 */}
-          {activeSection === 'learning' && learningSentences.length > 0 && (
-            <div className="quick-radio-banner">
-              <div className="banner-left">
-                <div className="banner-pulse-icon">
-                  <Headphones size={20} />
-                </div>
-                <div>
-                  <h4>학습 중인 문장만 모아듣기</h4>
-                  <p>산책할 때 화면을 끄고 3회 반복(영➔한➔영)으로 편안하게 들어보세요.</p>
-                </div>
-              </div>
-              <button 
-                type="button" 
-                className="banner-play-btn"
-                onClick={handlePlayLearningInRadio}
-              >
-                <span>라디오 재생</span>
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          )}
-
           {/* 실시간 검색창 */}
           <div className="sentence-search-box">
             <Search size={16} color="#94a3b8" />
@@ -259,9 +315,55 @@ export default function SentenceManager({ onPlayPlaylist }) {
             </button>
           </div>
 
-          {/* 문장 카드 리스트 */}
+          {/* 그룹핑 & 정렬 컨트롤 바 */}
+          <div className="group-sort-control-bar">
+            {/* 그룹핑 모드 토글 */}
+            <div className="group-mode-pills">
+              <span className="control-label">그룹:</span>
+              <button
+                type="button"
+                className={`control-pill ${groupMode === 'date' ? 'active' : ''}`}
+                onClick={() => setGroupMode('date')}
+              >
+                <Calendar size={12} />
+                <span>날짜별</span>
+              </button>
+              <button
+                type="button"
+                className={`control-pill ${groupMode === 'tag' ? 'active' : ''}`}
+                onClick={() => setGroupMode('tag')}
+              >
+                <Tag size={12} />
+                <span>주제별</span>
+              </button>
+              <button
+                type="button"
+                className={`control-pill ${groupMode === 'none' ? 'active' : ''}`}
+                onClick={() => setGroupMode('none')}
+              >
+                <span>전체</span>
+              </button>
+            </div>
+
+            {/* 정렬 셀렉터 */}
+            <div className="sort-selector-wrap">
+              <ArrowUpDown size={12} color="#64748b" />
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value)}
+                className="sort-dropdown"
+              >
+                <option value="latest">최신 등록순</option>
+                <option value="oldest">오래된순</option>
+                <option value="alpha">알파벳순</option>
+                <option value="bookmark">북마크 우선</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 문장 카드 리스트 (그룹핑 & 아코디언 접기 지원) */}
           <div className="sentence-cards-list">
-            {displayedSentences.length === 0 ? (
+            {sortedSentences.length === 0 ? (
               <div className="empty-state-box">
                 <p>
                   {activeSection === 'learning' 
@@ -270,77 +372,104 @@ export default function SentenceManager({ onPlayPlaylist }) {
                 </p>
               </div>
             ) : (
-              displayedSentences.map((s) => (
-                <div key={s.id} className={`sentence-master-card ${s.status === 'mastered' ? 'mastered-card' : ''}`}>
-                  {/* 카드 헤더 (출처, 상태 전환 버튼, 액션들) */}
-                  <div className="card-header-row">
-                    <span className="source-badge">{s.source || '직접 입력'}</span>
-
-                    <div className="card-top-icons">
-                      {/* 상태 토글: 학습 중일 땐 [외웠어요], 완료일 땐 [다시 복습] */}
-                      {activeSection === 'learning' ? (
-                        <button 
-                          type="button" 
-                          className="status-toggle-btn master-btn"
-                          onClick={() => handleMarkAsMastered(s.id)}
-                          title="학습 완료로 이동"
-                        >
-                          <Check size={14} />
-                          <span>외웠어요</span>
-                        </button>
-                      ) : (
-                        <button 
-                          type="button" 
-                          className="status-toggle-btn review-btn"
-                          onClick={() => handleMarkAsLearning(s.id)}
-                          title="다시 학습 중으로 이동"
-                        >
-                          <RotateCcw size={13} />
-                          <span>다시 학습</span>
-                        </button>
-                      )}
-
-                      <button 
-                        type="button" 
-                        className={`bookmark-btn ${s.isBookmarked ? 'bookmarked' : ''}`}
-                        onClick={() => handleToggleBookmark(s.id)}
+              groupedData.map((group) => {
+                const isCollapsed = collapsedGroups[group.key];
+                return (
+                  <div key={group.key} className="sentence-group-section">
+                    {group.title && (
+                      <div 
+                        className="group-section-header"
+                        onClick={() => setCollapsedGroups(prev => ({ ...prev, [group.key]: !prev[group.key] }))}
                       >
-                        <Bookmark size={16} fill={s.isBookmarked ? '#f59e0b' : 'none'} />
-                      </button>
-                      <button 
-                        type="button" 
-                        className="delete-btn"
-                        onClick={() => handleDeleteSentence(s.id)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+                        <div className="group-title-left">
+                          <span className="group-title-text">{group.title}</span>
+                          <span className="group-count-badge">{group.items.length}문장</span>
+                        </div>
+                        <ChevronDown 
+                          size={16} 
+                          className={`group-collapse-icon ${isCollapsed ? 'collapsed' : ''}`} 
+                        />
+                      </div>
+                    )}
+
+                    {!isCollapsed && (
+                      <div className="group-cards-wrap">
+                        {group.items.map((s) => (
+                          <div key={s.id} className={`sentence-master-card ${s.status === 'mastered' ? 'mastered-card' : ''}`}>
+                            {/* 카드 헤더 (생성일, 상태 전환 버튼, 액션들) */}
+                            <div className="card-header-row">
+                              <span className="date-badge">{formatDate(s.createdAt)}</span>
+
+                              <div className="card-top-icons">
+                                {/* 상태 토글: 학습 중일 땐 [외웠어요], 완료일 땐 [다시 복습] */}
+                                {activeSection === 'learning' ? (
+                                  <button 
+                                    type="button" 
+                                    className="status-toggle-btn master-btn"
+                                    onClick={() => handleMarkAsMastered(s.id)}
+                                    title="학습 완료로 이동"
+                                  >
+                                    <Check size={14} />
+                                    <span>외웠어요</span>
+                                  </button>
+                                ) : (
+                                  <button 
+                                    type="button" 
+                                    className="status-toggle-btn review-btn"
+                                    onClick={() => handleMarkAsLearning(s.id)}
+                                    title="다시 학습 중으로 이동"
+                                  >
+                                    <RotateCcw size={13} />
+                                    <span>다시 학습</span>
+                                  </button>
+                                )}
+
+                                <button 
+                                  type="button" 
+                                  className={`bookmark-btn ${s.isBookmarked ? 'bookmarked' : ''}`}
+                                  onClick={() => handleToggleBookmark(s.id)}
+                                >
+                                  <Bookmark size={16} fill={s.isBookmarked ? '#f59e0b' : 'none'} />
+                                </button>
+                                <button 
+                                  type="button" 
+                                  className="delete-btn"
+                                  onClick={() => handleDeleteSentence(s.id)}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* 영어 원문 (강조) */}
+                            <p className="master-en-text">{s.text}</p>
+                            
+                            {/* 한국어 번역 */}
+                            <p className="master-ko-text">{s.translation}</p>
+
+                            {/* 카드 하단 액션 버튼 바 */}
+                            <div className="card-footer-actions">
+                              <button type="button" className="action-pill-btn" onClick={() => handleSpeak(s.text)}>
+                                <Volume2 size={14} />
+                                <span>발음 듣기</span>
+                              </button>
+
+                              <button 
+                                type="button" 
+                                className="action-pill-btn playlist-add"
+                                onClick={() => setTargetSentenceForPl(s)}
+                              >
+                                <Plus size={14} />
+                                <span>플레이리스트에 담기</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-
-                  {/* 영어 원문 (강조) */}
-                  <p className="master-en-text">{s.text}</p>
-                  
-                  {/* 한국어 번역 */}
-                  <p className="master-ko-text">{s.translation}</p>
-
-                  {/* 카드 하단 액션 버튼 바 */}
-                  <div className="card-footer-actions">
-                    <button type="button" className="action-pill-btn" onClick={() => handleSpeak(s.text)}>
-                      <Volume2 size={14} />
-                      <span>발음 듣기</span>
-                    </button>
-
-                    <button 
-                      type="button" 
-                      className="action-pill-btn playlist-add"
-                      onClick={() => setTargetSentenceForPl(s)}
-                    >
-                      <Plus size={14} />
-                      <span>플레이리스트에 담기</span>
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { 
   Camera, Mic, Edit3, Sparkles, Volume2, Plus, Check, 
   ArrowRight, BookOpen, Layers, Bookmark, Square, Compass,
-  Wand2, CheckCircle2
+  Wand2, CheckCircle2, Image as ImageIcon
 } from 'lucide-react';
 import CropCanvas from './CropCanvas';
 import { SpeechService } from '../../services/speech';
@@ -17,18 +17,19 @@ const STARTER_PRESETS = [
 ];
 
 export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
-  const [activeMode, setActiveMode] = useState('camera'); // 'camera' | 'mic' | 'type'
   const [inputText, setInputText] = useState('');
   const [originalInputText, setOriginalInputText] = useState('');
   const [selectedVersion, setSelectedVersion] = useState('recommended'); // 'recommended' | 'original'
   const [translationText, setTranslationText] = useState('');
   
-  // 사진 크롭 관련 상태
+  // 사진 크롭 관련 상태 (카메라 / 앨범 분리)
   const [selectedImageSrc, setSelectedImageSrc] = useState(null);
   const [isCropping, setIsCropping] = useState(false);
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const albumInputRef = useRef(null);
 
   // 음성 STT 관련 상태
+  const [showMicBox, setShowMicBox] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
   // 단어 직접 터치로 단어장 추가 상태
@@ -266,83 +267,74 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
         />
       )}
 
-      {/* 컴팩트 헤더 */}
-      <div className="universal-header">
-        <h2 className="title">오늘의 문장 담기</h2>
-      </div>
-
-      {/* 3대 입력 모드 세그먼트 버튼 */}
-      <div className="mode-selector">
+      {/* 3대 빠른 입력 액션: [📷 사진 촬영] [🖼️ 앨범 선택] [🎙️ 음성 입력] */}
+      <div className="input-quick-actions-bar">
         <button 
-          type="button"
-          className={`mode-tab ${activeMode === 'camera' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveMode('camera');
-            fileInputRef.current?.click();
-          }}
+          type="button" 
+          className="quick-action-pill camera"
+          onClick={() => cameraInputRef.current?.click()}
         >
           <Camera size={16} />
-          <span>사진 인식</span>
+          <span>사진 촬영</span>
         </button>
 
         <button 
-          type="button"
-          className={`mode-tab ${activeMode === 'mic' ? 'active' : ''}`}
-          onClick={() => setActiveMode('mic')}
+          type="button" 
+          className="quick-action-pill album"
+          onClick={() => albumInputRef.current?.click()}
+        >
+          <ImageIcon size={16} />
+          <span>앨범 선택</span>
+        </button>
+
+        <button 
+          type="button" 
+          className={`quick-action-pill mic ${isListening ? 'listening' : showMicBox ? 'active' : ''}`}
+          onClick={() => {
+            if (!showMicBox) {
+              setShowMicBox(true);
+              toggleListening();
+            } else {
+              if (isListening) toggleListening();
+              setShowMicBox(false);
+            }
+          }}
         >
           <Mic size={16} />
-          <span>음성</span>
-        </button>
-
-        <button 
-          type="button"
-          className={`mode-tab ${activeMode === 'type' ? 'active' : ''}`}
-          onClick={() => setActiveMode('type')}
-        >
-          <Edit3 size={16} />
-          <span>직접 입력</span>
+          <span>{isListening ? '말하는 중...' : '음성 입력'}</span>
         </button>
       </div>
 
-      {/* 숨겨진 파일 인풋 (카메라 촬영/앨범 선택 지원) */}
+      {/* 숨겨진 2대 파일 인풋 (카메라 전용 / 앨범 파일 선택 전용) */}
       <input 
         type="file" 
-        ref={fileInputRef} 
+        ref={cameraInputRef} 
         accept="image/*" 
         capture="environment" 
         style={{ display: 'none' }} 
         onChange={handleFileChange}
       />
+      <input 
+        type="file" 
+        ref={albumInputRef} 
+        accept="image/*" 
+        style={{ display: 'none' }} 
+        onChange={handleFileChange}
+      />
 
-      {/* 모드별 컴팩트 트리거 */}
-      {activeMode === 'camera' && !inputText && (
-        <button 
-          type="button" 
-          className="compact-camera-trigger" 
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Camera size={18} />
-          <span>사진 촬영 또는 앨범에서 선택</span>
-        </button>
-      )}
-
-      {activeMode === 'mic' && (
-        <div className="compact-mic-box">
+      {/* 음성 녹음 제어 패널 (시작 및 종료 버튼 크기 완전히 동일하게 고정) */}
+      {(showMicBox || isListening) && (
+        <div className="compact-mic-box animate-fade-in">
           {isListening ? (
-            <div className="mic-active-container">
-              <div className="mic-recording-pulse">
-                <span className="rec-dot"></span>
-                <span className="rec-text">듣고 있어요... 영어를 말씀해 주세요 🎙️</span>
-              </div>
-              <button 
-                type="button" 
-                className="mic-action-btn stop"
-                onClick={toggleListening}
-              >
-                <Square size={16} fill="currentColor" />
-                <span>말하기 완료 (입력 종료)</span>
-              </button>
-            </div>
+            <button 
+              type="button" 
+              className="mic-action-btn stop"
+              onClick={toggleListening}
+            >
+              <div className="rec-dot"></div>
+              <Square size={16} fill="currentColor" />
+              <span>말하기 완료 (입력 종료)</span>
+            </button>
           ) : (
             <button 
               type="button" 
