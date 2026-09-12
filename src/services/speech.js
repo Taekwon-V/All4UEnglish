@@ -47,6 +47,84 @@ export const SpeechService = {
   },
 
   // 음성 인식 (STT - Speech to Text)
+  activeRecognizer: null,
+
+  /**
+   * 음성 인식 시작
+   */
+  startListening: (onResult, onEnd, { lang = 'en-US', onError } = {}) => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      const msg = '현재 사용 중인 브라우저에서 마이크 음성 인식을 지원하지 않습니다. (Chrome 또는 Safari 권장)';
+      alert(msg);
+      if (onError) onError(new Error(msg));
+      if (onEnd) onEnd();
+      return null;
+    }
+
+    // 기존 진행 중인 인식이 있다면 정리
+    if (SpeechService.activeRecognizer) {
+      try {
+        SpeechService.activeRecognizer.stop();
+      } catch {}
+      SpeechService.activeRecognizer = null;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = lang; // 기본 영어 인식 (en-US)
+
+      recognition.onresult = (event) => {
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          const part = event.results[i][0].transcript.trim();
+          fullTranscript += (fullTranscript ? ' ' : '') + part;
+        }
+        if (onResult && fullTranscript) {
+          onResult(fullTranscript);
+        }
+      };
+
+      recognition.onerror = (e) => {
+        console.warn('음성 인식 이벤트 오류:', e.error);
+        if (e.error === 'not-allowed') {
+          alert('마이크 접근 권한이 차단되어 있습니다. 브라우저 설정에서 마이크 권한을 허용해주세요.');
+        }
+        if (onError) onError(e);
+      };
+
+      recognition.onend = () => {
+        SpeechService.activeRecognizer = null;
+        if (onEnd) onEnd();
+      };
+
+      recognition.start();
+      SpeechService.activeRecognizer = recognition;
+      return recognition;
+    } catch (err) {
+      console.error('음성 인식 시작 실패:', err);
+      if (onError) onError(err);
+      if (onEnd) onEnd();
+      return null;
+    }
+  },
+
+  /**
+   * 음성 인식 즉시 종료 (말하기 완료)
+   */
+  stopListening: () => {
+    if (SpeechService.activeRecognizer) {
+      try {
+        SpeechService.activeRecognizer.stop();
+      } catch (e) {
+        console.warn('음성 인식 중지 에러:', e);
+      }
+      SpeechService.activeRecognizer = null;
+    }
+  },
+
   createRecognizer: ({ lang = 'en-US', onResult, onError, onEnd }) => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -62,7 +140,6 @@ export const SpeechService = {
       let finalText = '';
       let interimText = '';
 
-      // 0부터 전체 results를 순회하여 확정된 텍스트와 임시 텍스트를 분리 산출
       for (let i = 0; i < event.results.length; ++i) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {

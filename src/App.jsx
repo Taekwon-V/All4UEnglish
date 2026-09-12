@@ -204,18 +204,8 @@ export default function App() {
 
   return (
     <div className="mobile-app-shell">
-      {/* 상단 통합 헤더 */}
-      <header style={{
-        padding: '12px 18px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'var(--bg-surface, #ffffff)',
-        borderBottom: '1px solid rgba(45, 106, 79, 0.08)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100
-      }}>
+      {/* 상단 영구 고정 헤더 */}
+      <header className="app-fixed-header">
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontFamily: 'inherit', fontSize: '17px', fontWeight: 800, color: 'var(--text-headline, #0f172a)', lineHeight: 1.1 }}>
             All<span style={{ color: 'var(--primary, #059669)' }}>4U</span>English

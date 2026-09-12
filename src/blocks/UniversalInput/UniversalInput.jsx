@@ -1,10 +1,19 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Mic, Edit3, Sparkles, Volume2, Plus, Check, ArrowRight, BookOpen, Layers, Bookmark } from 'lucide-react';
+import { 
+  Camera, Mic, Edit3, Sparkles, Volume2, Plus, Check, 
+  ArrowRight, BookOpen, Layers, Bookmark, Square, Compass 
+} from 'lucide-react';
 import CropCanvas from './CropCanvas';
 import { SpeechService } from '../../services/speech';
 import { GeminiService } from '../../services/gemini';
 import { StorageService } from '../../services/storage';
 import './UniversalInput.css';
+
+const STARTER_PRESETS = [
+  { theme: '☕ 카페 주문', text: "Can I get an iced latte with oat milk, please?", trans: "오트 밀크 넣은 아이스 라떼 한 잔 주시겠어요?" },
+  { theme: '✈️ 여행/길찾기', text: "Excuse me, could you tell me how to get to the nearest station?", trans: "실례지만 가장 가까운 역으로 가는 길 좀 알려주시겠어요?" },
+  { theme: '💬 감정 & 하루', text: "It was a busy day, but I am proud of what I achieved today.", trans: "바쁜 하루였지만 오늘 해낸 일들이 자랑스러워요." }
+];
 
 export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
   const [activeMode, setActiveMode] = useState('camera'); // 'camera' | 'mic' | 'type'
@@ -18,6 +27,10 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
 
   // 음성 STT 관련 상태
   const [isListening, setIsListening] = useState(false);
+
+  // 단어 직접 터치로 단어장 추가 상태
+  const [tappedWords, setTappedWords] = useState({});
+  const [wordToast, setWordToast] = useState(null);
 
   // 로딩 & AI 분석 결과 상태
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -58,7 +71,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     }
   };
 
-  // 3. 음성 STT 토글
+  // 3. 음성 STT 시작 / 종료 제어
   const toggleListening = () => {
     if (isListening) {
       SpeechService.stopListening();
@@ -71,6 +84,10 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
         },
         () => {
           setIsListening(false);
+        },
+        {
+          lang: 'en-US',
+          onError: () => setIsListening(false)
         }
       );
     }
@@ -83,7 +100,27 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     }
   };
 
-  // 5. 문장 저장 & AI 추천 발굴 실행
+  // 5. 문장 속 특정 단어 직접 터치하여 단어장 저장
+  const handleTapWordInSentence = (rawWord) => {
+    const clean = rawWord.replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, '').trim();
+    if (!clean || clean.length < 2) return;
+    
+    const wordKey = clean.toLowerCase();
+    StorageService.saveWord({
+      word: clean,
+      phonetic: '',
+      partOfSpeech: '단어',
+      nuanceKo: '문장에서 직접 터치해 담은 단어',
+      originalSentence: inputText,
+      status: 'review'
+    });
+
+    setTappedWords(prev => ({ ...prev, [wordKey]: true }));
+    setWordToast(`'${clean}' 단어장에 추가됨! 📚`);
+    setTimeout(() => setWordToast(null), 2400);
+  };
+
+  // 6. 문장 저장 & AI 추천 발굴 실행
   const handleSaveAndAnalyze = async () => {
     if (!inputText.trim()) return;
 
@@ -118,7 +155,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     }
   };
 
-  // 6. 추천된 단어를 단어장에 추가
+  // 7. 추천된 단어를 단어장에 추가
   const handleAddWordToVocab = (wordItem, idx) => {
     StorageService.saveWord({
       word: wordItem.word,
@@ -134,7 +171,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     }));
   };
 
-  // 7. 추천된 문법을 문법장에 추가
+  // 8. 추천된 문법을 문법장에 추가
   const handleAddGrammar = () => {
     if (!analysisResult?.suggestedGrammar) return;
     const g = analysisResult.suggestedGrammar;
@@ -147,7 +184,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     setAddedItems(prev => ({ ...prev, grammar: true }));
   };
 
-  // 8. 추천된 숙어를 숙어장에 추가
+  // 9. 추천된 숙어를 숙어장에 추가
   const handleAddIdiom = (idiomItem, idx) => {
     StorageService.saveIdiom({
       idiom: idiomItem.idiom,
@@ -160,12 +197,14 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     }));
   };
 
-  // 9. 새로운 문장 입력 준비
+  // 10. 새로운 문장 입력 준비
   const handleResetForNext = () => {
     setInputText('');
     setTranslationText('');
     setAnalysisResult(null);
     setSavedSentenceId(null);
+    setTappedWords({});
+    setWordToast(null);
     setAddedItems({ words: {}, grammar: false, idioms: {} });
   };
 
@@ -242,15 +281,31 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
 
       {activeMode === 'mic' && (
         <div className="compact-mic-box">
-          <button 
-            type="button" 
-            className={`mic-pill-btn ${isListening ? 'listening' : ''}`}
-            onClick={toggleListening}
-          >
-            <Mic size={18} />
-            <span>{isListening ? '듣는 중... 말씀해 주세요 🎙️' : '마이크 터치하여 말하기'}</span>
-            {isListening && <div className="pulse-ripple" />}
-          </button>
+          {isListening ? (
+            <div className="mic-active-container">
+              <div className="mic-recording-pulse">
+                <span className="rec-dot"></span>
+                <span className="rec-text">듣고 있어요... 영어를 말씀해 주세요 🎙️</span>
+              </div>
+              <button 
+                type="button" 
+                className="mic-action-btn stop"
+                onClick={toggleListening}
+              >
+                <Square size={16} fill="currentColor" />
+                <span>말하기 완료 (입력 종료)</span>
+              </button>
+            </div>
+          ) : (
+            <button 
+              type="button" 
+              className="mic-action-btn start"
+              onClick={toggleListening}
+            >
+              <Mic size={18} />
+              <span>터치하여 영어로 말하기 (시작)</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -270,9 +325,46 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
           className="sentence-textarea"
           placeholder="영어 문장을 직접 입력하거나 사진/음성을 선택하세요"
           value={inputText}
-          rows={2}
+          rows={3}
           onChange={(e) => setInputText(e.target.value)}
         />
+
+        {/* 문장 속 특정 단어 직접 터치하여 단어장에 추가하는 인터랙티브 칩 영역 */}
+        {inputText.trim() && (
+          <div className="interactive-words-section">
+            <div className="words-tap-header">
+              <BookOpen size={13} />
+              <span>모르는 단어를 터치하면 단어장으로 쏙 들어갑니다:</span>
+            </div>
+            <div className="words-chip-wrap">
+              {inputText.trim().split(/\s+/).map((rawWord, idx) => {
+                const clean = rawWord.replace(/^[^a-zA-Z0-9'-]+|[^a-zA-Z0-9'-]+$/g, '');
+                const wordKey = clean.toLowerCase();
+                const isSaved = tappedWords[wordKey];
+                return (
+                  <button
+                    key={`${rawWord}-${idx}`}
+                    type="button"
+                    className={`word-tap-chip ${isSaved ? 'saved' : ''}`}
+                    onClick={() => handleTapWordInSentence(rawWord)}
+                    title={`'${clean}' 단어장에 추가`}
+                  >
+                    <span>{rawWord}</span>
+                    {isSaved && <Check size={11} className="chip-check-icon" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 단어 추가 알림 토스트 */}
+        {wordToast && (
+          <div className="word-toast-notice">
+            <Check size={14} />
+            <span>{wordToast}</span>
+          </div>
+        )}
 
         {translationText && (
           <div className="translation-preview">
@@ -304,6 +396,38 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
           )}
         </div>
       </div>
+
+      {/* 분석 전 초기 화면의 공백을 채우는 알찬 추천 문장 & 팁 카드 */}
+      {!analysisResult && (
+        <div className="quick-starter-card">
+          <div className="starter-header">
+            <div className="starter-badge">
+              <Compass size={14} />
+              <span>오늘의 추천 표현</span>
+            </div>
+            <span className="starter-hint">터치하면 문장창에 쏙 담겨요 👇</span>
+          </div>
+          <div className="starter-list">
+            {STARTER_PRESETS.map((item, i) => (
+              <div 
+                key={i} 
+                className="starter-item"
+                onClick={() => {
+                  setInputText(item.text);
+                  setTranslationText(item.trans);
+                }}
+              >
+                <div className="starter-item-header">
+                  <span className="starter-tag">{item.theme}</span>
+                  <span className="starter-action-hint">담기 +</span>
+                </div>
+                <div className="starter-en">{item.text}</div>
+                <div className="starter-ko">{item.trans}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* AI 추출 결과 및 각 보관함으로 원클릭 전송 섹션 */}
       {analysisResult && (

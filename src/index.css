@@ -85,16 +85,28 @@ html, body {
 .mobile-app-shell {
   width: 100%;
   max-width: 440px; /* 갤럭시 스마트폰 비율 래퍼 */
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh; /* 모바일 동적 주소창 완벽 대응 */
   background-color: var(--bg-canvas);
   position: relative;
   display: flex;
   flex-direction: column;
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.1);
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-top: var(--safe-top);
-  padding-bottom: var(--safe-bottom);
+  overflow: hidden; /* 탑 헤더와 바텀 네비가 절대 밀려나지 않도록 고정 */
+}
+
+/* Global Top Header */
+.app-fixed-header {
+  flex-shrink: 0;
+  width: 100%;
+  background: var(--bg-surface, #ffffff);
+  border-bottom: 1px solid rgba(45, 106, 79, 0.08);
+  padding: calc(var(--safe-top, 12px) + 8px) 18px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
 /* Global Bottom Navigation (Always Fixed at bottom) */
