@@ -105,26 +105,45 @@ export const GeminiService = {
     }
 
     const prompt = `
-당신은 한국인 아내를 위한 가장 다정하고 지혜로운 1:1 영어 튜터입니다.
-아래 영어 문장을 분석하여, 한국어 번역과 함께 문장 속에 담긴 핵심 [단어들(1~3개)], [문법 패턴(1개)], [숙어/관용구/이어동사(1~2개)]를 발굴해주세요.
+당신은 한국인 학습자를 위한 최고 수준의 다정하고 지혜로운 1:1 원어민 영어 튜터입니다.
+아래 사용자가 입력(또는 음성 인식/사진 추출)한 영어 문장을 분석해주세요.
 
 [영어 문장]:
 "${sentence}"
 
+[핵심 분석 임무]:
+1. [오타 & 문법 & 원어민 뉘앙스 교정]
+   - 사용자가 입력한 문장에 오타, 스펠링 오류, 문법적 오류(수 일치, 시제 등), 또는 어색하거나 딱딱한 콩글리시 표현이 있는지 정밀하게 검토하세요.
+   - 교정이나 더 자연스러운 원어민 표현으로의 개선이 필요한 경우:
+     * "hasCorrection": true
+     * "correctedSentence": "오타/문법을 교정하고 원어민이 일상에서 가장 자연스럽고 세련되게 사용하는 추천 문장"
+     * "correctionReason": "어떤 부분을 왜 고쳤는지 따뜻하고 이해하기 쉬운 1~2줄 한국어 설명 (예: 'got 대신 can I get을 사용하고 oat milk 표기를 바로잡아 원어민식 카페 주문 표현으로 다듬었어요')"
+   - 이미 문법적으로 오류가 없고 자연스러운 문장인 경우:
+     * "hasCorrection": false
+     * "correctedSentence": "${sentence}"
+     * "correctionReason": "오류 없이 완벽하고 자연스러운 문장입니다! ✨"
+2. [한국어 번역]:
+   - 최종 추천 문장에 맞는 매끄럽고 자연스러운 구어체 한국어 번역 ("translation")
+3. [단어/문법/숙어 추천 발굴]:
+   - 추천 문장(correctedSentence)에 담긴 핵심 단어(1~3개), 문법 패턴(1개), 숙어/표현(1~2개) 추출
+
 [응답 JSON 규격]:
 {
+  "hasCorrection": true,
+  "correctedSentence": "자연스럽게 교정 및 추천된 영어 문장",
+  "correctionReason": "교정 이유 및 원어민 표현 팁 (한국어 1~2줄)",
   "translation": "자연스럽고 매끄러운 한국어 번역",
   "suggestedWords": [
     {
       "word": "단어 원형",
       "phonetic": "[발음기호]",
-      "partOfSpeech": "품사 (동사, 형용사 등)",
+      "partOfSpeech": "품사",
       "nuanceKo": "단순 사전 뜻이 아닌 이 문맥 속 뉘앙스 해설"
     }
   ],
   "suggestedGrammar": {
-    "pattern": "문법 패턴 공식 (예: be reluctant to + 동사원형, I was wondering if...)",
-    "tag": "#패턴태그 (예: #망설임_표현)",
+    "pattern": "문법 패턴 공식 (예: Can I get + 명사?, be reluctant to + 동사원형)",
+    "tag": "#패턴태그",
     "explanation": "문법 용어 대신 말문이 트이도록 돕는 친절한 해설"
   },
   "suggestedIdioms": [
@@ -243,6 +262,9 @@ export const GeminiService = {
     const words = sentence.split(/\s+/).filter(w => w.length >= 4);
     const primary = words[0] ? words[0].replace(/[^a-zA-Z]/g, '') : 'wondering';
     return {
+      hasCorrection: false,
+      correctedSentence: sentence,
+      correctionReason: "완벽하고 자연스러운 표현입니다! ✨",
       translation: "이 문장은 자연스러운 일상 회화 표현입니다.",
       suggestedWords: [
         {

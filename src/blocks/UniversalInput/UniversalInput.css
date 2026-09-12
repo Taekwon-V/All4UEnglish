@@ -623,3 +623,169 @@
   color: #64748b;
   line-height: 1.35;
 }
+
+/* AI 문장 교정 & 추천 선택 카드 */
+.sentence-correction-card {
+  background: #ffffff;
+  border: 1.5px solid #a7f3d0;
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(5, 150, 105, 0.08);
+}
+
+.correction-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.correction-header-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #065f46;
+}
+
+.correction-header-tip {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.tutor-feedback-box {
+  background: #f0fdf4;
+  border: 1px solid #d1fae5;
+  border-radius: 10px;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tutor-feedback-label {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #047857;
+}
+
+.tutor-feedback-text {
+  font-size: 12.5px;
+  color: #065f46;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.correction-selection-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.version-select-box {
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.version-select-box:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.version-select-box.recommended {
+  border-color: #cbd5e1;
+}
+
+.version-select-box.recommended.active {
+  background: #ffffff;
+  border-color: #059669;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.15);
+}
+
+.version-select-box.original.active {
+  background: #ffffff;
+  border-color: #3b82f6;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.12);
+}
+
+.version-btn-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.version-pill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.version-pill-tag.green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.version-pill-tag.gray {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.version-status-pill {
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffffff;
+  background: #059669;
+  padding: 2px 7px;
+  border-radius: 12px;
+}
+
+.version-select-box.original.active .version-status-pill {
+  background: #3b82f6;
+}
+
+.version-text-en {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.4;
+}
+
+.version-text-ko {
+  font-size: 12.5px;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+/* 완벽한 문장 칭찬 배너 */
+.perfect-sentence-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: #166534;
+  font-size: 13px;
+  font-weight: 700;
+}
+

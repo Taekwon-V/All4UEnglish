@@ -309,6 +309,20 @@ export const StorageService = {
     }
   },
 
+  updateSentence: (sentenceId, updatedFields) => {
+    let changed = null;
+    const sentences = StorageService.getSentences().map(s => {
+      if (s.id === sentenceId) {
+        changed = { ...s, ...updatedFields, updatedAt: new Date().toISOString() };
+        return changed;
+      }
+      return s;
+    });
+    localStorage.setItem(STORAGE_KEYS.SENTENCES, JSON.stringify(sentences));
+    if (changed) syncToFirestore('sentences', changed.id, changed);
+    return sentences;
+  },
+
   setSentenceStatus: (sentenceId, status) => {
     let changed = null;
     const sentences = StorageService.getSentences().map(s => {

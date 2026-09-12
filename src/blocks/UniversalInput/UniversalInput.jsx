@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { 
   Camera, Mic, Edit3, Sparkles, Volume2, Plus, Check, 
-  ArrowRight, BookOpen, Layers, Bookmark, Square, Compass 
+  ArrowRight, BookOpen, Layers, Bookmark, Square, Compass,
+  Wand2, CheckCircle2
 } from 'lucide-react';
 import CropCanvas from './CropCanvas';
 import { SpeechService } from '../../services/speech';
@@ -18,6 +19,8 @@ const STARTER_PRESETS = [
 export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
   const [activeMode, setActiveMode] = useState('camera'); // 'camera' | 'mic' | 'type'
   const [inputText, setInputText] = useState('');
+  const [originalInputText, setOriginalInputText] = useState('');
+  const [selectedVersion, setSelectedVersion] = useState('recommended'); // 'recommended' | 'original'
   const [translationText, setTranslationText] = useState('');
   
   // 사진 크롭 관련 상태
@@ -122,20 +125,36 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
 
   // 6. 문장 저장 & AI 추천 발굴 실행
   const handleSaveAndAnalyze = async () => {
-    if (!inputText.trim()) return;
+    const raw = inputText.trim();
+    if (!raw) return;
 
     setIsAnalyzing(true);
+    setOriginalInputText(raw);
     try {
-      // 1) AI 분석 (단어, 문법, 숙어, 번역)
-      const result = await GeminiService.discoverFromSentence(inputText);
+      // 1) AI 분석 (오타/문법 교정 및 추천, 단어, 문법, 숙어, 번역)
+      const result = await GeminiService.discoverFromSentence(raw);
       setAnalysisResult(result);
       if (result.translation) {
         setTranslationText(result.translation);
       }
 
+      // 교정 추천 문장이 원문과 실질적으로 다른지 확인
+      const hasDiff = Boolean(
+        result.hasCorrection && 
+        result.correctedSentence && 
+        result.correctedSentence.trim().toLowerCase() !== raw.toLowerCase()
+      );
+
+      const chosenText = hasDiff ? result.correctedSentence.trim() : raw;
+      setSelectedVersion(hasDiff ? 'recommended' : 'original');
+      if (hasDiff) {
+        setInputText(result.correctedSentence.trim());
+      }
+
       // 2) 문장장에 영구 저장
       const saved = StorageService.saveSentence({
-        text: inputText.trim(),
+        text: chosenText,
+        originalText: raw,
         translation: result.translation || translationText || "자연스러운 일상 영어 표현",
         source: activeMode === 'camera' ? '사진 인식' : activeMode === 'mic' ? '음성 녹음' : '직접 입력',
         tags: ["신규", activeMode === 'camera' ? "책/영상" : "일상회화"]
@@ -153,6 +172,32 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // 6-1. 추천 문장 vs 원문 선택 전환
+  const handleSelectSentenceVersion = (version) => {
+    setSelectedVersion(version);
+    const targetText = version === 'recommended' 
+      ? (analysisResult?.correctedSentence?.trim() || inputText)
+      : (originalInputText || inputText);
+    
+    setInputText(targetText);
+
+    if (savedSentenceId) {
+      StorageService.updateSentence(savedSentenceId, {
+        text: targetText,
+        translation: (version === 'recommended' && analysisResult?.translation) 
+          ? analysisResult.translation 
+          : translationText
+      });
+    }
+
+    if (version === 'recommended') {
+      setWordToast('✨ AI 추천 자연스러운 문장으로 선택되었습니다!');
+    } else {
+      setWordToast('✏️ 내가 쓴 원문으로 선택되었습니다.');
+    }
+    setTimeout(() => setWordToast(null), 2400);
   };
 
   // 7. 추천된 단어를 단어장에 추가
@@ -200,6 +245,8 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
   // 10. 새로운 문장 입력 준비
   const handleResetForNext = () => {
     setInputText('');
+    setOriginalInputText('');
+    setSelectedVersion('recommended');
     setTranslationText('');
     setAnalysisResult(null);
     setSavedSentenceId(null);
@@ -436,6 +483,69 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
             <Check size={14} />
             <span>문장학습에 저장 완료</span>
           </div>
+
+          {/* AI 오타/문법 교정 및 자연스러운 문장 추천 선택 카드 */}
+          {analysisResult.hasCorrection && analysisResult.correctedSentence && originalInputText && (
+            <div className="sentence-correction-card animate-slide-up">
+              <div className="correction-card-header">
+                <div className="correction-header-badge">
+                  <Wand2 size={15} />
+                  <span>AI 문장 교정 & 추천</span>
+                </div>
+                <span className="correction-header-tip">원하는 버전을 터치하여 선택</span>
+              </div>
+
+              {analysisResult.correctionReason && (
+                <div className="tutor-feedback-box">
+                  <span className="tutor-feedback-label">💡 튜터 교정 코멘트:</span>
+                  <p className="tutor-feedback-text">{analysisResult.correctionReason}</p>
+                </div>
+              )}
+
+              <div className="correction-selection-grid">
+                {/* 1. AI 추천 자연스러운 문장 */}
+                <div
+                  className={`version-select-box recommended ${selectedVersion === 'recommended' ? 'active' : ''}`}
+                  onClick={() => handleSelectSentenceVersion('recommended')}
+                >
+                  <div className="version-btn-top">
+                    <span className="version-pill-tag green">
+                      {selectedVersion === 'recommended' && <CheckCircle2 size={13} />}
+                      <span>✨ AI 추천 문장 (네이티브)</span>
+                    </span>
+                    {selectedVersion === 'recommended' && <span className="version-status-pill">선택됨</span>}
+                  </div>
+                  <div className="version-text-en">{analysisResult.correctedSentence}</div>
+                  {analysisResult.translation && (
+                    <div className="version-text-ko">{analysisResult.translation}</div>
+                  )}
+                </div>
+
+                {/* 2. 내가 쓴 원문 */}
+                <div
+                  className={`version-select-box original ${selectedVersion === 'original' ? 'active' : ''}`}
+                  onClick={() => handleSelectSentenceVersion('original')}
+                >
+                  <div className="version-btn-top">
+                    <span className="version-pill-tag gray">
+                      {selectedVersion === 'original' && <CheckCircle2 size={13} />}
+                      <span>✏️ 내가 입력한 원문</span>
+                    </span>
+                    {selectedVersion === 'original' && <span className="version-status-pill">선택됨</span>}
+                  </div>
+                  <div className="version-text-en">{originalInputText}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 오타나 수정사항이 없는 완벽한 문장인 경우의 칭찬 배너 */}
+          {(!analysisResult.hasCorrection || analysisResult.correctedSentence?.trim().toLowerCase() === originalInputText.toLowerCase()) && (
+            <div className="perfect-sentence-badge animate-slide-up">
+              <CheckCircle2 size={16} />
+              <span>오타 없이 완벽하고 자연스러운 영어 문장입니다! ✨</span>
+            </div>
+          )}
 
           {/* 1. 추천 단어들 */}
           {analysisResult.suggestedWords && analysisResult.suggestedWords.length > 0 && (
