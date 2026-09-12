@@ -175,6 +175,28 @@ export const GeminiService = {
       const data = await response.json();
       const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
       const parsed = JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
+
+      // suggestedWords의 dictionaryMeanings 및 품사 필드 100% 보장
+      if (parsed && Array.isArray(parsed.suggestedWords)) {
+        parsed.suggestedWords = parsed.suggestedWords.map(w => {
+          let meanings = w.dictionaryMeanings;
+          if (!Array.isArray(meanings) || meanings.length === 0) {
+            // nuanceKo 또는 meaningKo를 활용해 사전 뜻 배열 생성
+            const fallbackText = w.meaningKo || w.nuanceKo || w.word;
+            meanings = fallbackText.split(/[,/·\n]/).map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+            if (meanings.length === 0) meanings = [fallbackText];
+          }
+          // "1. 뜻" 형태의 번호 접두사 정리
+          const cleanedMeanings = meanings.map(m => m.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+
+          return {
+            ...w,
+            partOfSpeech: w.partOfSpeech || '단어',
+            dictionaryMeanings: cleanedMeanings.length > 0 ? cleanedMeanings.slice(0, 3) : [w.nuanceKo || '대표 의미']
+          };
+        });
+      }
+
       return parsed;
     } catch (e) {
       console.warn('Gemini Discover Fallback 전환:', e);
@@ -272,6 +294,7 @@ export const GeminiService = {
           word: primary,
           phonetic: `[${primary.toLowerCase()}]`,
           partOfSpeech: "단어",
+          dictionaryMeanings: ["궁금해하다", "호기심을 갖다", "놀라워하다"],
           nuanceKo: "문맥 속에서 감정과 의도를 전달하는 중요 어휘"
         }
       ],

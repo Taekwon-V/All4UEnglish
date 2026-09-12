@@ -104,17 +104,20 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     }
   };
 
-  // 5. 문장 속 특정 단어 직접 터치하여 단어장 저장
+  // 5. 문장 속 특정 단어 직접 터치하여 단어장 저장 (사전적 의미 자동 연동)
   const handleTapWordInSentence = (rawWord) => {
     const clean = rawWord.replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, '').trim();
     if (!clean || clean.length < 2) return;
     
     const wordKey = clean.toLowerCase();
+    
+    // 1차 기본 저장 (즉각적 반응)
     StorageService.saveWord({
       word: clean,
       phonetic: '',
       partOfSpeech: '단어',
-      nuanceKo: '문장에서 직접 터치해 담은 단어',
+      dictionaryMeanings: [clean],
+      nuanceKo: `'${inputText}' 문장에서 담은 단어`,
       originalSentence: inputText,
       status: 'review'
     });
@@ -122,6 +125,21 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     setTappedWords(prev => ({ ...prev, [wordKey]: true }));
     setWordToast(`'${clean}' 단어장에 추가됨! 📚`);
     setTimeout(() => setWordToast(null), 2400);
+
+    // 2차 백그라운드 AI 사전 조회로 대표 뜻 3개 및 품사 자동 완성
+    GeminiService.lookupExpression('word', clean).then(info => {
+      if (info && info.dictionaryMeanings && info.dictionaryMeanings.length > 0) {
+        StorageService.saveWord({
+          word: clean,
+          phonetic: info.phonetic || '',
+          partOfSpeech: info.partOfSpeech || '단어',
+          dictionaryMeanings: info.dictionaryMeanings.slice(0, 3),
+          nuanceKo: info.nuanceKo || info.dictionaryMeanings.join(', '),
+          originalSentence: inputText,
+          status: 'review'
+        });
+      }
+    }).catch(() => {});
   };
 
   // 6. 문장 저장 & AI 추천 발굴 실행
@@ -158,7 +176,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
         originalText: raw,
         translation: result.translation || translationText || "자연스러운 일상 영어 표현",
         source: activeMode === 'camera' ? '사진 인식' : activeMode === 'mic' ? '음성 녹음' : '직접 입력',
-        tags: ["신규", activeMode === 'camera' ? "책/영상" : "일상회화"]
+        tags: ["일상"]
       });
       
       const newSentence = saved[0];
@@ -201,13 +219,21 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     setTimeout(() => setWordToast(null), 2400);
   };
 
-  // 7. 추천된 단어를 단어장에 추가
+  // 7. 추천된 단어를 단어장에 추가 (사전적 대표 의미 3개 및 품사 100% 보장)
   const handleAddWordToVocab = (wordItem, idx) => {
+    let dictMeanings = wordItem.dictionaryMeanings;
+    if (!Array.isArray(dictMeanings) || dictMeanings.length === 0) {
+      const fallback = wordItem.meaningKo || wordItem.nuanceKo || '';
+      dictMeanings = fallback ? fallback.split(/[,/·\n]/).map(s => s.trim()).filter(Boolean) : [];
+      if (dictMeanings.length === 0) dictMeanings = [wordItem.word];
+    }
+
     StorageService.saveWord({
       word: wordItem.word,
       phonetic: wordItem.phonetic || '',
       partOfSpeech: wordItem.partOfSpeech || '단어',
-      nuanceKo: wordItem.nuanceKo || '',
+      dictionaryMeanings: dictMeanings.slice(0, 3),
+      nuanceKo: wordItem.nuanceKo || dictMeanings.join(', '),
       originalSentence: inputText,
       status: 'review'
     });

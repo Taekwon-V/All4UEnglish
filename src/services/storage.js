@@ -16,103 +16,13 @@ const STORAGE_KEYS = {
   get PLAYLISTS() { return `all4u_${currentSpaceId}_playlists`; }
 };
 
-// 기본 초기 샘플 데이터
-const INITIAL_SENTENCES = [
-  {
-    id: 's-init-1',
-    text: "I was wondering if you could help me find a quiet cafe around here.",
-    translation: "혹시 이 근처에 조용한 카페 찾는 것 좀 도와주실 수 있나요?",
-    source: "직접 입력",
-    tags: ["일상", "카페", "정중한부탁"],
-    isBookmarked: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 's-init-2',
-    text: "She was reluctant to leave the cozy room, so she decided to call it a day.",
-    translation: "그녀는 아늑한 방을 떠나기가 망설여져서 오늘은 이만 끝내기로 했다.",
-    source: "원서 읽기",
-    tags: ["감정", "숙어"],
-    isBookmarked: false,
-    createdAt: new Date().toISOString()
-  }
-];
+// 기본 초기 데이터는 비어 있는 상태로 시작 (사용자 정의 학습 자산만 보관)
+const INITIAL_SENTENCES = [];
+const INITIAL_GRAMMAR = [];
+const INITIAL_IDIOMS = [];
+const INITIAL_WORDS = [];
+const INITIAL_PLAYLISTS = [];
 
-const INITIAL_GRAMMAR = [
-  {
-    id: 'g-init-1',
-    pattern: "I was wondering if you could + [동사원형]",
-    tag: "#정중한_부탁",
-    explanation: "상대방에게 부담을 주지 않고 조심스럽게 호의나 도움을 구할 때 쓰는 표현입니다.",
-    originalSentence: "I was wondering if you could help me find a quiet cafe around here.",
-    variations: [
-      { en: "I was wondering if you could check this email for me?", ko: "혹시 이 이메일 한번 봐주실 수 있을까요?" },
-      { en: "I was wondering if you could recommend a good movie?", ko: "혹시 좋은 영화 한 편 추천해 주실 수 있나요?" }
-    ],
-    isBookmarked: true,
-    createdAt: new Date().toISOString()
-  }
-];
-
-const INITIAL_IDIOMS = [
-  {
-    id: 'i-init-1',
-    idiom: "call it a day",
-    meaning: "오늘 하루 일을 이쯤에서 마무리하다 / 끝내다",
-    originalSentence: "She was reluctant to leave the cozy room, so she decided to call it a day.",
-    variations: [
-      { en: "We've been working for six hours, let's call it a day.", ko: "6시간 동안 일했으니 오늘은 이만 마무리합시다." },
-      { en: "I'm too tired to keep reading, time to call it a day.", ko: "너무 피곤해서 더 못 읽겠어요, 이제 그만 잘래요." }
-    ],
-    isBookmarked: true,
-    createdAt: new Date().toISOString()
-  }
-];
-
-const INITIAL_WORDS = [
-  {
-    id: 'w-init-1',
-    word: "reluctant",
-    phonetic: "[rɪˈlʌktənt]",
-    partOfSpeech: "형용사",
-    nuanceKo: "마음속에서 주저하고 망설이며 내키지 않아 하는 상태",
-    originalSentence: "She was reluctant to leave the cozy room, so she decided to call it a day.",
-    variations: [
-      { en: "He was reluctant to admit his mistake at first.", ko: "그는 처음에는 자신의 실수를 인정하기를 망설였습니다." },
-      { en: "She was reluctant to spend money on things she didn't need.", ko: "그녀는 불필요한 것에 돈 쓰는 것을 꺼려했습니다." }
-    ],
-    status: "review",
-    isBookmarked: true,
-    reviewCount: 2,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'w-init-2',
-    word: "cozy",
-    phonetic: "[ˈkoʊzi]",
-    partOfSpeech: "형용사",
-    nuanceKo: "따뜻하고 편안하게 감싸여 안락한 느낌",
-    originalSentence: "She was reluctant to leave the cozy room, so she decided to call it a day.",
-    variations: [
-      { en: "This small cafe has a very cozy atmosphere.", ko: "이 작은 카페는 분위기가 무척 아늑해요." },
-      { en: "I love staying in a cozy bed on rainy Sundays.", ko: "비 오는 일요일엔 아늑한 침대에 누워 있는 게 정말 좋아요." }
-    ],
-    status: "mastered",
-    isBookmarked: false,
-    reviewCount: 4,
-    createdAt: new Date().toISOString()
-  }
-];
-
-const INITIAL_PLAYLISTS = [
-  {
-    id: 'pl-init-1',
-    title: "🎧 카페 & 일상 베스트 표현",
-    description: "산책할 때 편안하게 반복해서 듣는 핵심 문장들",
-    sentenceIds: ['s-init-1', 's-init-2'],
-    createdAt: new Date().toISOString()
-  }
-];
 
 // Firestore 백그라운드 싱크 헬퍼 (학습공간 spaces/{currentSpaceId}/... 경로와 매칭)
 const syncToFirestore = async (collectionName, docId, data) => {
@@ -175,18 +85,26 @@ export const StorageService = {
     try {
       // 1. 문장 동기화 (spaces/{targetSpace}/sentences)
       let sSnap = await getDocs(collection(db, 'spaces', targetSpace, 'sentences'));
-      // 마스터 공간 최초 진입 시 기존 루트 컬렉션이 있다면 마이그레이션
       if (sSnap.empty && targetSpace === 'space_master') {
         const rootSnap = await getDocs(collection(db, 'sentences'));
         if (!rootSnap.empty) {
           for (const d of rootSnap.docs) {
-            await setDoc(doc(db, 'spaces', targetSpace, 'sentences', d.id), d.data(), { merge: true });
+            if (!d.id.includes('-init-')) {
+              await setDoc(doc(db, 'spaces', targetSpace, 'sentences', d.id), d.data(), { merge: true });
+            }
           }
           sSnap = await getDocs(collection(db, 'spaces', targetSpace, 'sentences'));
         }
       }
       if (!sSnap.empty) {
-        const cloudSentences = sSnap.docs.map(d => d.data());
+        const cloudSentences = [];
+        for (const d of sSnap.docs) {
+          if (d.id.includes('-init-')) {
+            await deleteDoc(doc(db, 'spaces', targetSpace, 'sentences', d.id)).catch(() => {});
+          } else {
+            cloudSentences.push(d.data());
+          }
+        }
         localStorage.setItem(`all4u_${targetSpace}_sentences`, JSON.stringify(cloudSentences));
       }
 
@@ -196,13 +114,22 @@ export const StorageService = {
         const rootSnap = await getDocs(collection(db, 'words'));
         if (!rootSnap.empty) {
           for (const d of rootSnap.docs) {
-            await setDoc(doc(db, 'spaces', targetSpace, 'words', d.id), d.data(), { merge: true });
+            if (!d.id.includes('-init-')) {
+              await setDoc(doc(db, 'spaces', targetSpace, 'words', d.id), d.data(), { merge: true });
+            }
           }
           wSnap = await getDocs(collection(db, 'spaces', targetSpace, 'words'));
         }
       }
       if (!wSnap.empty) {
-        const cloudWords = wSnap.docs.map(d => d.data());
+        const cloudWords = [];
+        for (const d of wSnap.docs) {
+          if (d.id.includes('-init-')) {
+            await deleteDoc(doc(db, 'spaces', targetSpace, 'words', d.id)).catch(() => {});
+          } else {
+            cloudWords.push(d.data());
+          }
+        }
         localStorage.setItem(`all4u_${targetSpace}_vocab`, JSON.stringify(cloudWords));
       }
 
@@ -212,13 +139,22 @@ export const StorageService = {
         const rootSnap = await getDocs(collection(db, 'grammar'));
         if (!rootSnap.empty) {
           for (const d of rootSnap.docs) {
-            await setDoc(doc(db, 'spaces', targetSpace, 'grammar', d.id), d.data(), { merge: true });
+            if (!d.id.includes('-init-')) {
+              await setDoc(doc(db, 'spaces', targetSpace, 'grammar', d.id), d.data(), { merge: true });
+            }
           }
           gSnap = await getDocs(collection(db, 'spaces', targetSpace, 'grammar'));
         }
       }
       if (!gSnap.empty) {
-        const cloudGrammar = gSnap.docs.map(d => d.data());
+        const cloudGrammar = [];
+        for (const d of gSnap.docs) {
+          if (d.id.includes('-init-')) {
+            await deleteDoc(doc(db, 'spaces', targetSpace, 'grammar', d.id)).catch(() => {});
+          } else {
+            cloudGrammar.push(d.data());
+          }
+        }
         localStorage.setItem(`all4u_${targetSpace}_grammar`, JSON.stringify(cloudGrammar));
       }
 
@@ -228,13 +164,22 @@ export const StorageService = {
         const rootSnap = await getDocs(collection(db, 'idioms'));
         if (!rootSnap.empty) {
           for (const d of rootSnap.docs) {
-            await setDoc(doc(db, 'spaces', targetSpace, 'idioms', d.id), d.data(), { merge: true });
+            if (!d.id.includes('-init-')) {
+              await setDoc(doc(db, 'spaces', targetSpace, 'idioms', d.id), d.data(), { merge: true });
+            }
           }
           iSnap = await getDocs(collection(db, 'spaces', targetSpace, 'idioms'));
         }
       }
       if (!iSnap.empty) {
-        const cloudIdioms = iSnap.docs.map(d => d.data());
+        const cloudIdioms = [];
+        for (const d of iSnap.docs) {
+          if (d.id.includes('-init-')) {
+            await deleteDoc(doc(db, 'spaces', targetSpace, 'idioms', d.id)).catch(() => {});
+          } else {
+            cloudIdioms.push(d.data());
+          }
+        }
         localStorage.setItem(`all4u_${targetSpace}_idioms`, JSON.stringify(cloudIdioms));
       }
 
@@ -244,13 +189,22 @@ export const StorageService = {
         const rootSnap = await getDocs(collection(db, 'playlists'));
         if (!rootSnap.empty) {
           for (const d of rootSnap.docs) {
-            await setDoc(doc(db, 'spaces', targetSpace, 'playlists', d.id), d.data(), { merge: true });
+            if (!d.id.includes('-init-')) {
+              await setDoc(doc(db, 'spaces', targetSpace, 'playlists', d.id), d.data(), { merge: true });
+            }
           }
           pSnap = await getDocs(collection(db, 'spaces', targetSpace, 'playlists'));
         }
       }
       if (!pSnap.empty) {
-        const cloudPlaylists = pSnap.docs.map(d => d.data());
+        const cloudPlaylists = [];
+        for (const d of pSnap.docs) {
+          if (d.id.includes('-init-')) {
+            await deleteDoc(doc(db, 'spaces', targetSpace, 'playlists', d.id)).catch(() => {});
+          } else {
+            cloudPlaylists.push(d.data());
+          }
+        }
         localStorage.setItem(`all4u_${targetSpace}_playlists`, JSON.stringify(cloudPlaylists));
       }
     } catch (e) {
@@ -262,16 +216,23 @@ export const StorageService = {
   getSentences: () => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.SENTENCES);
-      const list = data ? JSON.parse(data) : INITIAL_SENTENCES;
-      // status 기본값 보장 (마이그레이션)
-      return list.map(s => ({
+      if (!data) return [];
+      const list = JSON.parse(data);
+      if (!Array.isArray(list)) return [];
+      // s-init- 계열 잔존 더미 데이터 제거
+      const cleaned = list.filter(s => !s.id || !s.id.startsWith('s-init-'));
+      if (cleaned.length !== list.length) {
+        localStorage.setItem(STORAGE_KEYS.SENTENCES, JSON.stringify(cleaned));
+      }
+      return cleaned.map(s => ({
         ...s,
-        status: s.status || 'learning' // 'learning' (학습 중) | 'mastered' (학습 완료)
+        status: s.status || 'learning'
       }));
     } catch {
-      return INITIAL_SENTENCES;
+      return [];
     }
   },
+
 
   saveSentence: (sentenceData) => {
     try {
@@ -367,13 +328,16 @@ export const StorageService = {
   getGrammar: () => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.GRAMMAR);
-      if (!data) {
-        localStorage.setItem(STORAGE_KEYS.GRAMMAR, JSON.stringify(INITIAL_GRAMMAR));
-        return INITIAL_GRAMMAR;
+      if (!data) return [];
+      const list = JSON.parse(data);
+      if (!Array.isArray(list)) return [];
+      const cleaned = list.filter(g => !g.id || !g.id.startsWith('g-init-'));
+      if (cleaned.length !== list.length) {
+        localStorage.setItem(STORAGE_KEYS.GRAMMAR, JSON.stringify(cleaned));
       }
-      return JSON.parse(data);
+      return cleaned;
     } catch {
-      return INITIAL_GRAMMAR;
+      return [];
     }
   },
 
@@ -449,13 +413,16 @@ export const StorageService = {
   getIdioms: () => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.IDIOMS);
-      if (!data) {
-        localStorage.setItem(STORAGE_KEYS.IDIOMS, JSON.stringify(INITIAL_IDIOMS));
-        return INITIAL_IDIOMS;
+      if (!data) return [];
+      const list = JSON.parse(data);
+      if (!Array.isArray(list)) return [];
+      const cleaned = list.filter(i => !i.id || !i.id.startsWith('i-init-'));
+      if (cleaned.length !== list.length) {
+        localStorage.setItem(STORAGE_KEYS.IDIOMS, JSON.stringify(cleaned));
       }
-      return JSON.parse(data);
+      return cleaned;
     } catch {
-      return INITIAL_IDIOMS;
+      return [];
     }
   },
 
@@ -531,13 +498,16 @@ export const StorageService = {
   getWords: () => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.WORDS);
-      if (!data) {
-        localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(INITIAL_WORDS));
-        return INITIAL_WORDS;
+      if (!data) return [];
+      const list = JSON.parse(data);
+      if (!Array.isArray(list)) return [];
+      const cleaned = list.filter(w => !w.id || !w.id.startsWith('w-init-'));
+      if (cleaned.length !== list.length) {
+        localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(cleaned));
       }
-      return JSON.parse(data);
+      return cleaned;
     } catch {
-      return INITIAL_WORDS;
+      return [];
     }
   },
 
@@ -648,13 +618,16 @@ export const StorageService = {
   getPlaylists: () => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.PLAYLISTS);
-      if (!data) {
-        localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(INITIAL_PLAYLISTS));
-        return INITIAL_PLAYLISTS;
+      if (!data) return [];
+      const list = JSON.parse(data);
+      if (!Array.isArray(list)) return [];
+      const cleaned = list.filter(p => !p.id || !p.id.startsWith('pl-init-'));
+      if (cleaned.length !== list.length) {
+        localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(cleaned));
       }
-      return JSON.parse(data);
+      return cleaned;
     } catch {
-      return INITIAL_PLAYLISTS;
+      return [];
     }
   },
 

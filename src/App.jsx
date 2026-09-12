@@ -93,11 +93,28 @@ export default function App() {
   // 음성 및 발음 설정 모달 상태
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [voiceSettings, setVoiceSettings] = useState(() => SpeechService.getSettings());
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [voiceTab, setVoiceTab] = useState('system'); // 'system' (기기 실제 음성) | 'preset' (원어민 프리셋)
 
-  const handleUpdateVoice = (voiceId) => {
-    const updated = SpeechService.setSettings({ voiceId });
+  useEffect(() => {
+    SpeechService.getAvailableVoices((voices) => {
+      setAvailableVoices(voices);
+    });
+  }, []);
+
+  // 기기 실제 음성 직접 선택
+  const handleSelectSystemVoice = (voiceURI) => {
+    const updated = SpeechService.setSettings({ voiceURI, voiceId: null });
     setVoiceSettings(updated);
-    // 선택하자마자 해당 보이스로 즉시 시연 멘트 발화
+    SpeechService.speak("Hello! This voice will now read all your English sentences clearly.", {
+      rate: voiceSettings.rate
+    });
+  };
+
+  // 프리셋 선택
+  const handleUpdateVoice = (voiceId) => {
+    const updated = SpeechService.setSettings({ voiceId, voiceURI: null });
+    setVoiceSettings(updated);
     handleTestVoice(voiceId);
   };
 
@@ -108,7 +125,6 @@ export default function App() {
 
   const handleTestVoice = (specificVoiceId) => {
     const targetId = specificVoiceId || voiceSettings.voiceId;
-    const profile = CURATED_VOICES.find(p => p.id === targetId);
     let sampleText = "Hello! I am Jenny. Let's make English fun and easy!";
     if (targetId === 'samantha') {
       sampleText = "Hello. I am Samantha. Let's practice English together comfortably.";
@@ -698,12 +714,96 @@ export default function App() {
               </button>
             </div>
 
-            {/* 1. 보이스 선택 (여성 2명, 남성 2명 총 4종) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#475569' }}>원어민 보이스 선택 (4종)</span>
+            {/* 음성 선택 모드 탭 (기기 음성 직접 선택 vs 프리셋) */}
+            <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '12px', gap: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setVoiceTab('system')}
+                style={{
+                  flex: 1,
+                  padding: '7px 0',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: voiceTab === 'system' ? '#ffffff' : 'transparent',
+                  color: voiceTab === 'system' ? '#0f172a' : '#64748b',
+                  fontSize: '12.5px',
+                  fontWeight: voiceTab === 'system' ? 700 : 500,
+                  cursor: 'pointer',
+                  boxShadow: voiceTab === 'system' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
+                }}
+              >
+                📱 내 폰/PC 실제 음성
+              </button>
+              <button
+                type="button"
+                onClick={() => setVoiceTab('preset')}
+                style={{
+                  flex: 1,
+                  padding: '7px 0',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: voiceTab === 'preset' ? '#ffffff' : 'transparent',
+                  color: voiceTab === 'preset' ? '#0f172a' : '#64748b',
+                  fontSize: '12.5px',
+                  fontWeight: voiceTab === 'preset' ? 700 : 500,
+                  cursor: 'pointer',
+                  boxShadow: voiceTab === 'preset' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
+                }}
+              >
+                🎭 분위기 프리셋 (4종)
+              </button>
+            </div>
+
+            {/* 1-A. 기기 실제 음성 직접 선택 */}
+            {voiceTab === 'system' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>
+                  현재 기기에 설치된 음성을 직접 지정하면 다른 목소리로 바뀌지 않고 고정됩니다:
+                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
+                  {availableVoices.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '16px', fontSize: '12.5px', color: '#94a3b8' }}>
+                      브라우저 기본 음성을 불러오는 중이거나 1종만 지원됩니다.
+                    </div>
+                  ) : (
+                    availableVoices.map((v) => {
+                      const isSelected = voiceSettings.voiceURI === v.voiceURI;
+                      return (
+                        <div
+                          key={v.voiceURI || v.name}
+                          onClick={() => handleSelectSystemVoice(v.voiceURI)}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: isSelected ? '2px solid #059669' : '1px solid #e2e8f0',
+                            background: isSelected ? '#f0fdf4' : '#ffffff',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+                            <span style={{ fontSize: '13px', fontWeight: isSelected ? 700 : 500, color: isSelected ? '#065f46' : '#1e293b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                              {v.name}
+                            </span>
+                            <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>{v.lang}</span>
+                          </div>
+                          {isSelected && <CheckCircle size={16} color="#059669" />}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 1-B. 원어민 분위기 프리셋 선택 */}
+            {voiceTab === 'preset' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {CURATED_VOICES.map((v) => {
-                  const isSelected = voiceSettings.voiceId === v.id;
+                  const isSelected = !voiceSettings.voiceURI && voiceSettings.voiceId === v.id;
                   return (
                     <div
                       key={v.id}
@@ -728,7 +828,7 @@ export default function App() {
                   );
                 })}
               </div>
-            </div>
+            )}
 
             {/* 2. 발음 듣기 속도 조절 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

@@ -59,12 +59,39 @@ export const CURATED_VOICES = [
 
 // 음성 합성 (TTS - Text to Speech)
 export const SpeechService = {
+  // 사용 가능한 실제 브라우저/기기 영어 음성 목록 조회
+  getAvailableVoices: (callback) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      return [];
+    }
+
+    const fetchEnVoices = () => {
+      const all = window.speechSynthesis.getVoices();
+      const en = all.filter(v => v.lang && (v.lang.startsWith('en') || v.lang.startsWith('EN')));
+      return en.length > 0 ? en : all;
+    };
+
+    const current = fetchEnVoices();
+    if (current.length > 0) {
+      if (callback) callback(current);
+      return current;
+    }
+
+    if (callback) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        const loaded = fetchEnVoices();
+        callback(loaded);
+      };
+    }
+    return [];
+  },
+
   getSettings: () => {
     try {
       const saved = localStorage.getItem(VOICE_SETTINGS_KEY);
       if (saved) return JSON.parse(saved);
     } catch {}
-    return { voiceId: 'jenny', rate: 1.0 };
+    return { voiceId: 'jenny', voiceURI: null, rate: 1.0 };
   },
 
   setSettings: (settings) => {
@@ -78,7 +105,7 @@ export const SpeechService = {
     }
   },
 
-  // 영어 또는 한국어 문장 낭독
+  // 영어 또는 한국어 문장 낭독 (선택한 목소리 100% 확정 고정)
   speak: (text, { lang = 'en-US', rate, pitch, onEnd = () => {} } = {}) => {
     if (!('speechSynthesis' in window)) {
       console.warn('이 브라우저는 음성 합성을 지원하지 않습니다.');
@@ -96,35 +123,58 @@ export const SpeechService = {
 
     if (lang.startsWith('en')) {
       const allVoices = (cachedVoices && cachedVoices.length > 0) ? cachedVoices : window.speechSynthesis.getVoices();
-      const enVoices = allVoices.filter(v => v.lang.startsWith('en'));
-      const targetId = userSettings.voiceId || 'jenny';
-      const profile = CURATED_VOICES.find(p => p.id === targetId) || CURATED_VOICES[0];
-      
-      // 1. 키워드 기반 시스템 보이스 매칭
-      let matchedVoice = null;
-      for (const kw of profile.keywords) {
-        matchedVoice = enVoices.find(v => v.name.toLowerCase().includes(kw));
-        if (matchedVoice) break;
+      const enVoices = allVoices.filter(v => v.lang && (v.lang.startsWith('en') || v.lang.startsWith('EN')));
+
+      let chosenVoice = null;
+
+      // 1. [최우선] 사용자가 기기 실제 음성을 직접 고른 경우 (voiceURI 매칭)
+      if (userSettings.voiceURI) {
+        chosenVoice = allVoices.find(v => v.voiceURI === userSettings.voiceURI || v.name === userSettings.voiceURI);
       }
 
-      // 남성 보이스 요청 시 여성 키워드가 포함된 음성 배제 및 남성 보이스 탐색
-      if (profile.gender === 'male' && (!matchedVoice || matchedVoice.name.toLowerCase().includes('female'))) {
-        const maleVoice = enVoices.find(v => {
-          const n = v.name.toLowerCase();
-          return (n.includes('male') && !n.includes('female')) || n.includes('david') || n.includes('george') || n.includes('alex') || n.includes('guy');
-        });
-        if (maleVoice) matchedVoice = maleVoice;
+      // 2. 프리셋 기반 음성 매칭
+      if (!chosenVoice) {
+        const targetId = userSettings.voiceId || 'jenny';
+        const profile = CURATED_VOICES.find(p => p.id === targetId) || CURATED_VOICES[0];
+
+        if (profile.gender === 'male') {
+          // 남성 보이스 탐색 (female 제외)
+          chosenVoice = enVoices.find(v => {
+            const n = v.name.toLowerCase();
+            return (n.includes('male') && !n.includes('female')) || n.includes('david') || n.includes('george') || n.includes('alex') || n.includes('guy') || n.includes('daniel');
+          });
+        } else {
+          // 여성 보이스 탐색
+          chosenVoice = enVoices.find(v => {
+            const n = v.name.toLowerCase();
+            return n.includes('female') || n.includes('zira') || n.includes('samantha') || n.includes('jenny') || n.includes('karen') || n.includes('victoria');
+          });
+        }
+
+        // 그래도 없으면 일반 매칭
+        if (!chosenVoice) {
+          for (const kw of profile.keywords) {
+            chosenVoice = enVoices.find(v => v.name.toLowerCase().includes(kw));
+            if (chosenVoice) break;
+          }
+        }
+
+        if (!chosenVoice && enVoices.length > 0) {
+          chosenVoice = enVoices[0];
+        }
+
+        // 어쿠스틱 피치 & 속도 변조
+        utterance.pitch = pitch !== undefined ? pitch : profile.pitch;
+        utterance.rate = finalRate * profile.rateFactor;
+      } else {
+        // 직접 고른 보이스는 본래 음색 유지
+        utterance.pitch = pitch !== undefined ? pitch : 1.0;
+        utterance.rate = finalRate;
       }
 
-      if (matchedVoice) {
-        utterance.voice = matchedVoice;
-      } else if (enVoices.length > 0) {
-        utterance.voice = enVoices[0];
+      if (chosenVoice) {
+        utterance.voice = chosenVoice;
       }
-
-      // 2. 어쿠스틱 피치 & 속도 변조 (단일 음성 기기에서도 남성/여성/개성 차이를 100% 실감나게 변환)
-      utterance.pitch = pitch !== undefined ? pitch : profile.pitch;
-      utterance.rate = finalRate * profile.rateFactor;
     } else {
       utterance.rate = finalRate;
       utterance.pitch = pitch !== undefined ? pitch : 1.0;
