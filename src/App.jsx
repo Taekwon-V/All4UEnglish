@@ -33,6 +33,7 @@ export default function App() {
   const [targetRadioPlaylist, setTargetRadioPlaylist] = useState(null);
 
   useEffect(() => {
+    StorageService.initCloudSync();
     const checkMode = () => {
       setIsStandaloneMode(new URLSearchParams(window.location.search).has('block'));
     };

@@ -1,7 +1,9 @@
 /**
- * Storage Service (LocalStorage Master Adapter)
- * 4대 학습 자산(문장장, 문법장, 숙어장, 단어장) 및 플레이리스트 영구 저장소
+ * Storage Service (Hybrid Firestore Cloud DB + LocalStorage Cache)
+ * 4대 학습 자산(문장장, 문법장, 숙어장, 단어장) 및 플레이리스트의 클라우드 영구 저장소
  */
+import { db } from './firebase';
+import { collection, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
   SESSIONS: 'all4u_study_sessions',
@@ -12,7 +14,7 @@ const STORAGE_KEYS = {
   PLAYLISTS: 'all4u_playlists_master'
 };
 
-// 기본 초기 샘플 데이터 (앱을 처음 켰을 때도 즉시 체험 가능하도록)
+// 기본 초기 샘플 데이터
 const INITIAL_SENTENCES = [
   {
     id: 's-init-1',
@@ -110,7 +112,66 @@ const INITIAL_PLAYLISTS = [
   }
 ];
 
+// Firestore 백그라운드 싱크 헬퍼
+const syncToFirestore = async (collectionName, docId, data) => {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, collectionName, docId), data, { merge: true });
+  } catch (e) {
+    // Firestore가 활성화되기 전이거나 오프라인일 때 조용히 캐시 유지
+    console.debug(`[Firestore Sync Pending: ${collectionName}/${docId}]`, e.message);
+  }
+};
+
+const deleteFromFirestore = async (collectionName, docId) => {
+  if (!db) return;
+  try {
+    await deleteDoc(doc(db, collectionName, docId));
+  } catch (e) {
+    console.debug(`[Firestore Delete Pending: ${collectionName}/${docId}]`, e.message);
+  }
+};
+
 export const StorageService = {
+  // 앱 시작 시 클라우드 데이터와 자동 동기화 시도
+  initCloudSync: async () => {
+    if (!db) return;
+    try {
+      // 1. 문장 동기화
+      const sSnap = await getDocs(collection(db, 'sentences'));
+      if (!sSnap.empty) {
+        const cloudSentences = sSnap.docs.map(d => d.data());
+        localStorage.setItem(STORAGE_KEYS.SENTENCES, JSON.stringify(cloudSentences));
+      }
+      // 2. 단어 동기화
+      const wSnap = await getDocs(collection(db, 'words'));
+      if (!wSnap.empty) {
+        const cloudWords = wSnap.docs.map(d => d.data());
+        localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(cloudWords));
+      }
+      // 3. 문법 동기화
+      const gSnap = await getDocs(collection(db, 'grammar'));
+      if (!gSnap.empty) {
+        const cloudGrammar = gSnap.docs.map(d => d.data());
+        localStorage.setItem(STORAGE_KEYS.GRAMMAR, JSON.stringify(cloudGrammar));
+      }
+      // 4. 숙어 동기화
+      const iSnap = await getDocs(collection(db, 'idioms'));
+      if (!iSnap.empty) {
+        const cloudIdioms = iSnap.docs.map(d => d.data());
+        localStorage.setItem(STORAGE_KEYS.IDIOMS, JSON.stringify(cloudIdioms));
+      }
+      // 5. 플레이리스트 동기화
+      const pSnap = await getDocs(collection(db, 'playlists'));
+      if (!pSnap.empty) {
+        const cloudPlaylists = pSnap.docs.map(d => d.data());
+        localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(cloudPlaylists));
+      }
+    } catch (e) {
+      console.debug('Cloud sync initial check:', e.message);
+    }
+  },
+
   // ================= 1. 문장장 (Sentences) =================
   getSentences: () => {
     try {
@@ -131,20 +192,23 @@ export const StorageService = {
       const existingIdx = sentences.findIndex(s => s.text.trim().toLowerCase() === sentenceData.text.trim().toLowerCase());
       
       let updated;
+      let targetItem;
       if (existingIdx >= 0) {
         updated = [...sentences];
-        updated[existingIdx] = { ...sentences[existingIdx], ...sentenceData };
+        targetItem = { ...sentences[existingIdx], ...sentenceData };
+        updated[existingIdx] = targetItem;
       } else {
-        const newSentence = {
+        targetItem = {
           ...sentenceData,
           id: sentenceData.id || 's-' + Date.now(),
           tags: sentenceData.tags || [],
           isBookmarked: sentenceData.isBookmarked || false,
           createdAt: sentenceData.createdAt || new Date().toISOString()
         };
-        updated = [newSentence, ...sentences];
+        updated = [targetItem, ...sentences];
       }
       localStorage.setItem(STORAGE_KEYS.SENTENCES, JSON.stringify(updated));
+      syncToFirestore('sentences', targetItem.id, targetItem);
       return updated;
     } catch (e) {
       console.error('문장 저장 실패:', e);
@@ -155,14 +219,21 @@ export const StorageService = {
   deleteSentence: (sentenceId) => {
     const sentences = StorageService.getSentences().filter(s => s.id !== sentenceId);
     localStorage.setItem(STORAGE_KEYS.SENTENCES, JSON.stringify(sentences));
+    deleteFromFirestore('sentences', sentenceId);
     return sentences;
   },
 
   toggleSentenceBookmark: (sentenceId) => {
-    const sentences = StorageService.getSentences().map(s => 
-      s.id === sentenceId ? { ...s, isBookmarked: !s.isBookmarked } : s
-    );
+    let changed = null;
+    const sentences = StorageService.getSentences().map(s => {
+      if (s.id === sentenceId) {
+        changed = { ...s, isBookmarked: !s.isBookmarked };
+        return changed;
+      }
+      return s;
+    });
     localStorage.setItem(STORAGE_KEYS.SENTENCES, JSON.stringify(sentences));
+    if (changed) syncToFirestore('sentences', changed.id, changed);
     return sentences;
   },
 
@@ -186,20 +257,23 @@ export const StorageService = {
       const existingIdx = list.findIndex(g => g.pattern.trim().toLowerCase() === grammarData.pattern.trim().toLowerCase());
       
       let updated;
+      let targetItem;
       if (existingIdx >= 0) {
         updated = [...list];
-        updated[existingIdx] = { ...list[existingIdx], ...grammarData };
+        targetItem = { ...list[existingIdx], ...grammarData };
+        updated[existingIdx] = targetItem;
       } else {
-        const newItem = {
+        targetItem = {
           ...grammarData,
           id: grammarData.id || 'g-' + Date.now(),
           variations: grammarData.variations || [],
           isBookmarked: grammarData.isBookmarked || false,
           createdAt: new Date().toISOString()
         };
-        updated = [newItem, ...list];
+        updated = [targetItem, ...list];
       }
       localStorage.setItem(STORAGE_KEYS.GRAMMAR, JSON.stringify(updated));
+      syncToFirestore('grammar', targetItem.id, targetItem);
       return updated;
     } catch (e) {
       console.error('문법 저장 실패:', e);
@@ -208,17 +282,19 @@ export const StorageService = {
   },
 
   addGrammarVariation: (grammarId, variation) => {
+    let changed = null;
     const list = StorageService.getGrammar().map(item => {
       if (item.id === grammarId) {
         const variations = item.variations || [];
-        // 중복 방지
         if (!variations.some(v => v.en === variation.en)) {
-          return { ...item, variations: [...variations, variation] };
+          changed = { ...item, variations: [...variations, variation] };
+          return changed;
         }
       }
       return item;
     });
     localStorage.setItem(STORAGE_KEYS.GRAMMAR, JSON.stringify(list));
+    if (changed) syncToFirestore('grammar', changed.id, changed);
     return list;
   },
 
@@ -242,20 +318,23 @@ export const StorageService = {
       const existingIdx = list.findIndex(i => i.idiom.trim().toLowerCase() === idiomData.idiom.trim().toLowerCase());
       
       let updated;
+      let targetItem;
       if (existingIdx >= 0) {
         updated = [...list];
-        updated[existingIdx] = { ...list[existingIdx], ...idiomData };
+        targetItem = { ...list[existingIdx], ...idiomData };
+        updated[existingIdx] = targetItem;
       } else {
-        const newItem = {
+        targetItem = {
           ...idiomData,
           id: idiomData.id || 'i-' + Date.now(),
           variations: idiomData.variations || [],
           isBookmarked: idiomData.isBookmarked || false,
           createdAt: new Date().toISOString()
         };
-        updated = [newItem, ...list];
+        updated = [targetItem, ...list];
       }
       localStorage.setItem(STORAGE_KEYS.IDIOMS, JSON.stringify(updated));
+      syncToFirestore('idioms', targetItem.id, targetItem);
       return updated;
     } catch (e) {
       console.error('숙어 저장 실패:', e);
@@ -264,16 +343,19 @@ export const StorageService = {
   },
 
   addIdiomVariation: (idiomId, variation) => {
+    let changed = null;
     const list = StorageService.getIdioms().map(item => {
       if (item.id === idiomId) {
         const variations = item.variations || [];
         if (!variations.some(v => v.en === variation.en)) {
-          return { ...item, variations: [...variations, variation] };
+          changed = { ...item, variations: [...variations, variation] };
+          return changed;
         }
       }
       return item;
     });
     localStorage.setItem(STORAGE_KEYS.IDIOMS, JSON.stringify(list));
+    if (changed) syncToFirestore('idioms', changed.id, changed);
     return list;
   },
 
@@ -297,15 +379,17 @@ export const StorageService = {
       const existingIdx = words.findIndex(w => w.word.trim().toLowerCase() === wordData.word.trim().toLowerCase());
 
       let updatedWords;
+      let targetItem;
       if (existingIdx >= 0) {
         updatedWords = [...words];
-        updatedWords[existingIdx] = {
+        targetItem = {
           ...words[existingIdx],
           ...wordData,
           reviewCount: (words[existingIdx].reviewCount || 0) + 1
         };
+        updatedWords[existingIdx] = targetItem;
       } else {
-        const newWord = {
+        targetItem = {
           ...wordData,
           id: wordData.id || 'w-' + Date.now(),
           status: wordData.status || 'review',
@@ -314,10 +398,11 @@ export const StorageService = {
           reviewCount: 1,
           createdAt: new Date().toISOString()
         };
-        updatedWords = [newWord, ...words];
+        updatedWords = [targetItem, ...words];
       }
 
       localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(updatedWords));
+      syncToFirestore('words', targetItem.id, targetItem);
       return updatedWords;
     } catch (e) {
       console.error('단어 저장 실패:', e);
@@ -326,31 +411,48 @@ export const StorageService = {
   },
 
   addWordVariation: (wordId, variation) => {
+    let changed = null;
     const list = StorageService.getWords().map(item => {
       if (item.id === wordId) {
         const variations = item.variations || [];
         if (!variations.some(v => v.en === variation.en)) {
-          return { ...item, variations: [...variations, variation] };
+          changed = { ...item, variations: [...variations, variation] };
+          return changed;
         }
       }
       return item;
     });
     localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(list));
+    if (changed) syncToFirestore('words', changed.id, changed);
     return list;
   },
 
   setWordStatus: (wordId, status) => {
-    const words = StorageService.getWords();
-    const updated = words.map(w => w.id === wordId ? { ...w, status } : w);
-    localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(updated));
-    return updated;
+    let changed = null;
+    const words = StorageService.getWords().map(w => {
+      if (w.id === wordId) {
+        changed = { ...w, status };
+        return changed;
+      }
+      return w;
+    });
+    localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(words));
+    if (changed) syncToFirestore('words', changed.id, changed);
+    return words;
   },
 
   toggleBookmark: (wordId) => {
-    const words = StorageService.getWords();
-    const updated = words.map(w => w.id === wordId ? { ...w, isBookmarked: !w.isBookmarked } : w);
-    localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(updated));
-    return updated;
+    let changed = null;
+    const words = StorageService.getWords().map(w => {
+      if (w.id === wordId) {
+        changed = { ...w, isBookmarked: !w.isBookmarked };
+        return changed;
+      }
+      return w;
+    });
+    localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(words));
+    if (changed) syncToFirestore('words', changed.id, changed);
+    return words;
   },
 
   // ================= 5. 플레이리스트 (Playlists) =================
@@ -373,19 +475,22 @@ export const StorageService = {
       const existingIdx = playlists.findIndex(p => p.id === playlistData.id);
 
       let updated;
+      let targetItem;
       if (existingIdx >= 0) {
         updated = [...playlists];
-        updated[existingIdx] = { ...playlists[existingIdx], ...playlistData };
+        targetItem = { ...playlists[existingIdx], ...playlistData };
+        updated[existingIdx] = targetItem;
       } else {
-        const newPl = {
+        targetItem = {
           ...playlistData,
           id: playlistData.id || 'pl-' + Date.now(),
           sentenceIds: playlistData.sentenceIds || [],
           createdAt: new Date().toISOString()
         };
-        updated = [newPl, ...playlists];
+        updated = [targetItem, ...playlists];
       }
       localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(updated));
+      syncToFirestore('playlists', targetItem.id, targetItem);
       return updated;
     } catch (e) {
       console.error('플레이리스트 저장 실패:', e);
@@ -394,34 +499,41 @@ export const StorageService = {
   },
 
   addSentenceToPlaylist: (playlistId, sentenceId) => {
+    let changed = null;
     const playlists = StorageService.getPlaylists().map(pl => {
       if (pl.id === playlistId && !pl.sentenceIds.includes(sentenceId)) {
-        return { ...pl, sentenceIds: [...pl.sentenceIds, sentenceId] };
+        changed = { ...pl, sentenceIds: [...pl.sentenceIds, sentenceId] };
+        return changed;
       }
       return pl;
     });
     localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(playlists));
+    if (changed) syncToFirestore('playlists', changed.id, changed);
     return playlists;
   },
 
   removeSentenceFromPlaylist: (playlistId, sentenceId) => {
+    let changed = null;
     const playlists = StorageService.getPlaylists().map(pl => {
       if (pl.id === playlistId) {
-        return { ...pl, sentenceIds: pl.sentenceIds.filter(id => id !== sentenceId) };
+        changed = { ...pl, sentenceIds: pl.sentenceIds.filter(id => id !== sentenceId) };
+        return changed;
       }
       return pl;
     });
     localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(playlists));
+    if (changed) syncToFirestore('playlists', changed.id, changed);
     return playlists;
   },
 
   deletePlaylist: (playlistId) => {
     const playlists = StorageService.getPlaylists().filter(pl => pl.id !== playlistId);
     localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(playlists));
+    deleteFromFirestore('playlists', playlistId);
     return playlists;
   },
 
-  // ================= 6. 학습 세션 (과거 호환 유지) =================
+  // ================= 6. 학습 세션 =================
   saveSession: (sessionData) => {
     try {
       const sessions = StorageService.getSessions();
@@ -432,6 +544,7 @@ export const StorageService = {
       };
       const updatedSessions = [newSession, ...sessions.filter(s => s.id !== newSession.id)];
       localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(updatedSessions));
+      syncToFirestore('sessions', newSession.id, newSession);
       return newSession;
     } catch {
       return sessionData;
