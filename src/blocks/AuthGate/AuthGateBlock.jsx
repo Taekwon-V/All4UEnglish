@@ -8,6 +8,8 @@ import {
   WhitelistService, 
   MASTER_ADMIN_EMAIL 
 } from '../../services/firebase';
+import { WorkspaceService } from '../../services/workspace';
+import { StorageService } from '../../services/storage';
 import './AuthGateBlock.css';
 
 export function AuthGateComponent({
@@ -34,12 +36,17 @@ export function AuthGateComponent({
 
       // 마스터 관리자(inchul17.kim@gmail.com)는 항상 전체 권한 프리패스
       if (userEmail === MASTER_ADMIN_EMAIL.toLowerCase()) {
+        const spaceInfo = await WorkspaceService.getOrCreateUserSpace(userEmail, user.displayName || '', true);
+        StorageService.setActiveSpace(spaceInfo.spaceId);
+        await StorageService.initCloudSync(spaceInfo.spaceId);
         onLoginSuccess({
           uid: user.uid,
           email: user.email,
           displayName: user.displayName || '관리자',
           photoURL: user.photoURL,
-          isAdmin: true
+          isAdmin: true,
+          spaceId: spaceInfo.spaceId,
+          spaceName: spaceInfo.spaceName
         });
         return;
       }
@@ -47,16 +54,22 @@ export function AuthGateComponent({
       // 등록된 화이트리스트 계정인지 Firestore 검증
       const isAllowed = await WhitelistService.isEmailAllowed(userEmail);
       if (isAllowed) {
+        const spaceInfo = await WorkspaceService.getOrCreateUserSpace(userEmail, user.displayName || '', false);
+        StorageService.setActiveSpace(spaceInfo.spaceId);
+        await StorageService.initCloudSync(spaceInfo.spaceId);
         onLoginSuccess({
           uid: user.uid,
           email: user.email,
           displayName: user.displayName || '학습자',
           photoURL: user.photoURL,
-          isAdmin: false
+          isAdmin: false,
+          spaceId: spaceInfo.spaceId,
+          spaceName: spaceInfo.spaceName
         });
       } else {
         // 비인가 계정 -> 즉시 차단 및 로그아웃
         await signOut(auth);
+        StorageService.setActiveSpace('space_master');
         setBlockedEmail(user.email);
       }
     } catch (error) {

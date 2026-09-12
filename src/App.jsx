@@ -11,6 +11,7 @@ import RetentionTest from './blocks/RetentionTest/RetentionTest';
 
 // 서비스 임포트
 import { StorageService } from './services/storage';
+import { WorkspaceService } from './services/workspace';
 import { 
   auth, 
   signOut, 
@@ -31,7 +32,8 @@ import {
   Trash2, 
   X, 
   CheckCircle,
-  Shield 
+  Shield,
+  FolderLock
 } from 'lucide-react';
 
 export default function App() {
@@ -55,9 +57,6 @@ export default function App() {
 
   // 1. 세션 체크 및 Firebase Auth 상태 감지
   useEffect(() => {
-    // Cloud Firestore 초기 데이터 동기화
-    StorageService.initCloudSync();
-
     const checkMode = () => {
       setIsStandaloneMode(new URLSearchParams(window.location.search).has('block'));
     };
@@ -72,19 +71,32 @@ export default function App() {
           const isAllowed = isMaster || await WhitelistService.isEmailAllowed(userEmail);
 
           if (isAllowed) {
+            // 개인 ID에 학습공간 배정 및 매칭
+            const spaceInfo = await WorkspaceService.getOrCreateUserSpace(
+              userEmail,
+              firebaseUser.displayName || '',
+              isMaster
+            );
+            StorageService.setActiveSpace(spaceInfo.spaceId);
+            await StorageService.initCloudSync(spaceInfo.spaceId);
+
             setCurrentUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               displayName: firebaseUser.displayName || (isMaster ? '관리자' : '학습자'),
               photoURL: firebaseUser.photoURL,
-              isAdmin: isMaster
+              isAdmin: isMaster,
+              spaceId: spaceInfo.spaceId,
+              spaceName: spaceInfo.spaceName
             });
           } else {
             // 비인가 사용자
             await signOut(auth);
+            StorageService.setActiveSpace('space_master');
             setCurrentUser(null);
           }
         } else {
+          StorageService.setActiveSpace('space_master');
           setCurrentUser(null);
         }
         setAuthLoading(false);
@@ -94,6 +106,7 @@ export default function App() {
         window.removeEventListener('popstate', checkMode);
       };
     } else {
+      StorageService.initCloudSync('space_master');
       setAuthLoading(false);
       return () => window.removeEventListener('popstate', checkMode);
     }
@@ -146,10 +159,13 @@ export default function App() {
 
   // 로그아웃
   const handleLogout = async () => {
-    if (auth) {
-      await signOut(auth);
+    if (window.confirm('로그아웃 하시겠습니까?')) {
+      if (auth) {
+        await signOut(auth);
+      }
+      StorageService.setActiveSpace('space_master');
+      setCurrentUser(null);
     }
-    setCurrentUser(null);
   };
 
   // 레고 블록 단독 러너 모드
@@ -190,7 +206,7 @@ export default function App() {
     <div className="mobile-app-shell">
       {/* 상단 통합 헤더 */}
       <header style={{
-        padding: '12px 20px',
+        padding: '12px 18px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -200,12 +216,13 @@ export default function App() {
         top: 0,
         zIndex: 100
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontFamily: 'inherit', fontSize: '18px', fontWeight: 800, color: 'var(--text-headline, #0f172a)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontFamily: 'inherit', fontSize: '17px', fontWeight: 800, color: 'var(--text-headline, #0f172a)', lineHeight: 1.1 }}>
             All<span style={{ color: 'var(--primary, #059669)' }}>4U</span>English
           </span>
-          <span style={{ fontSize: '11px', color: '#64748b' }}>
-            {currentUser.isAdmin ? '👑 관리자' : 'for Sarah'}
+          <span style={{ fontSize: '11px', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
+            {currentUser.spaceName || (currentUser.isAdmin ? '마스터 메인 공간' : '내 학습공간')}
           </span>
         </div>
 
@@ -257,9 +274,9 @@ export default function App() {
       </header>
 
       {/* =========================================================================
-          메인 바디 콘텐츠 (5대 탭 분기)
+          메인 바디 콘텐츠 (5대 탭 분기 - spaceId 기반 리마운트 및 데이터 격리)
           ========================================================================= */}
-      <main style={{ 
+      <main key={currentUser?.spaceId || 'guest'} style={{ 
         flex: 1, 
         display: 'flex', 
         flexDirection: 'column', 

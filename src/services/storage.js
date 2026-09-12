@@ -5,13 +5,15 @@
 import { db } from './firebase';
 import { collection, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 
+let currentSpaceId = 'space_master';
+
 const STORAGE_KEYS = {
-  SESSIONS: 'all4u_study_sessions',
-  SENTENCES: 'all4u_sentences_master',
-  GRAMMAR: 'all4u_grammar_master',
-  IDIOMS: 'all4u_idioms_master',
-  WORDS: 'all4u_vocab_master',
-  PLAYLISTS: 'all4u_playlists_master'
+  get SESSIONS() { return `all4u_${currentSpaceId}_study_sessions`; },
+  get SENTENCES() { return `all4u_${currentSpaceId}_sentences`; },
+  get GRAMMAR() { return `all4u_${currentSpaceId}_grammar`; },
+  get IDIOMS() { return `all4u_${currentSpaceId}_idioms`; },
+  get WORDS() { return `all4u_${currentSpaceId}_vocab`; },
+  get PLAYLISTS() { return `all4u_${currentSpaceId}_playlists`; }
 };
 
 // 기본 초기 샘플 데이터
@@ -112,60 +114,144 @@ const INITIAL_PLAYLISTS = [
   }
 ];
 
-// Firestore 백그라운드 싱크 헬퍼
+// Firestore 백그라운드 싱크 헬퍼 (학습공간 spaces/{currentSpaceId}/... 경로와 매칭)
 const syncToFirestore = async (collectionName, docId, data) => {
   if (!db) return;
   try {
-    await setDoc(doc(db, collectionName, docId), data, { merge: true });
+    await setDoc(doc(db, 'spaces', currentSpaceId, collectionName, docId), data, { merge: true });
   } catch (e) {
-    // Firestore가 활성화되기 전이거나 오프라인일 때 조용히 캐시 유지
-    console.debug(`[Firestore Sync Pending: ${collectionName}/${docId}]`, e.message);
+    console.debug(`[Firestore Sync Pending: spaces/${currentSpaceId}/${collectionName}/${docId}]`, e.message);
   }
 };
 
 const deleteFromFirestore = async (collectionName, docId) => {
   if (!db) return;
   try {
-    await deleteDoc(doc(db, collectionName, docId));
+    await deleteDoc(doc(db, 'spaces', currentSpaceId, collectionName, docId));
   } catch (e) {
-    console.debug(`[Firestore Delete Pending: ${collectionName}/${docId}]`, e.message);
+    console.debug(`[Firestore Delete Pending: spaces/${currentSpaceId}/${collectionName}/${docId}]`, e.message);
   }
 };
 
 export const StorageService = {
-  // 앱 시작 시 클라우드 데이터와 자동 동기화 시도
-  initCloudSync: async () => {
+  /**
+   * 현재 활성 학습공간(spaceId) 지정
+   */
+  setActiveSpace: (spaceId) => {
+    if (spaceId) {
+      currentSpaceId = spaceId;
+
+      // 마스터 계정의 경우 이전 캐시 키(all4u_*_master)에서 자동 마이그레이션
+      if (spaceId === 'space_master') {
+        const legacyMap = [
+          { oldK: 'all4u_sentences_master', newK: 'all4u_space_master_sentences' },
+          { oldK: 'all4u_grammar_master', newK: 'all4u_space_master_grammar' },
+          { oldK: 'all4u_idioms_master', newK: 'all4u_space_master_idioms' },
+          { oldK: 'all4u_vocab_master', newK: 'all4u_space_master_vocab' },
+          { oldK: 'all4u_playlists_master', newK: 'all4u_space_master_playlists' }
+        ];
+        legacyMap.forEach(({ oldK, newK }) => {
+          const oldVal = localStorage.getItem(oldK);
+          const newVal = localStorage.getItem(newK);
+          if (oldVal && !newVal) {
+            localStorage.setItem(newK, oldVal);
+          }
+        });
+      }
+    }
+  },
+
+  /**
+   * 현재 활성 학습공간 ID 조회
+   */
+  getActiveSpace: () => currentSpaceId,
+
+  /**
+   * 앱 시작 및 로그인 시 지정된 학습공간(spaceId) 클라우드 데이터와 자동 동기화
+   */
+  initCloudSync: async (spaceId = currentSpaceId) => {
     if (!db) return;
+    const targetSpace = spaceId || currentSpaceId;
     try {
-      // 1. 문장 동기화
-      const sSnap = await getDocs(collection(db, 'sentences'));
+      // 1. 문장 동기화 (spaces/{targetSpace}/sentences)
+      let sSnap = await getDocs(collection(db, 'spaces', targetSpace, 'sentences'));
+      // 마스터 공간 최초 진입 시 기존 루트 컬렉션이 있다면 마이그레이션
+      if (sSnap.empty && targetSpace === 'space_master') {
+        const rootSnap = await getDocs(collection(db, 'sentences'));
+        if (!rootSnap.empty) {
+          for (const d of rootSnap.docs) {
+            await setDoc(doc(db, 'spaces', targetSpace, 'sentences', d.id), d.data(), { merge: true });
+          }
+          sSnap = await getDocs(collection(db, 'spaces', targetSpace, 'sentences'));
+        }
+      }
       if (!sSnap.empty) {
         const cloudSentences = sSnap.docs.map(d => d.data());
-        localStorage.setItem(STORAGE_KEYS.SENTENCES, JSON.stringify(cloudSentences));
+        localStorage.setItem(`all4u_${targetSpace}_sentences`, JSON.stringify(cloudSentences));
       }
-      // 2. 단어 동기화
-      const wSnap = await getDocs(collection(db, 'words'));
+
+      // 2. 단어 동기화 (spaces/{targetSpace}/words)
+      let wSnap = await getDocs(collection(db, 'spaces', targetSpace, 'words'));
+      if (wSnap.empty && targetSpace === 'space_master') {
+        const rootSnap = await getDocs(collection(db, 'words'));
+        if (!rootSnap.empty) {
+          for (const d of rootSnap.docs) {
+            await setDoc(doc(db, 'spaces', targetSpace, 'words', d.id), d.data(), { merge: true });
+          }
+          wSnap = await getDocs(collection(db, 'spaces', targetSpace, 'words'));
+        }
+      }
       if (!wSnap.empty) {
         const cloudWords = wSnap.docs.map(d => d.data());
-        localStorage.setItem(STORAGE_KEYS.WORDS, JSON.stringify(cloudWords));
+        localStorage.setItem(`all4u_${targetSpace}_vocab`, JSON.stringify(cloudWords));
       }
-      // 3. 문법 동기화
-      const gSnap = await getDocs(collection(db, 'grammar'));
+
+      // 3. 문법 동기화 (spaces/{targetSpace}/grammar)
+      let gSnap = await getDocs(collection(db, 'spaces', targetSpace, 'grammar'));
+      if (gSnap.empty && targetSpace === 'space_master') {
+        const rootSnap = await getDocs(collection(db, 'grammar'));
+        if (!rootSnap.empty) {
+          for (const d of rootSnap.docs) {
+            await setDoc(doc(db, 'spaces', targetSpace, 'grammar', d.id), d.data(), { merge: true });
+          }
+          gSnap = await getDocs(collection(db, 'spaces', targetSpace, 'grammar'));
+        }
+      }
       if (!gSnap.empty) {
         const cloudGrammar = gSnap.docs.map(d => d.data());
-        localStorage.setItem(STORAGE_KEYS.GRAMMAR, JSON.stringify(cloudGrammar));
+        localStorage.setItem(`all4u_${targetSpace}_grammar`, JSON.stringify(cloudGrammar));
       }
-      // 4. 숙어 동기화
-      const iSnap = await getDocs(collection(db, 'idioms'));
+
+      // 4. 숙어 동기화 (spaces/{targetSpace}/idioms)
+      let iSnap = await getDocs(collection(db, 'spaces', targetSpace, 'idioms'));
+      if (iSnap.empty && targetSpace === 'space_master') {
+        const rootSnap = await getDocs(collection(db, 'idioms'));
+        if (!rootSnap.empty) {
+          for (const d of rootSnap.docs) {
+            await setDoc(doc(db, 'spaces', targetSpace, 'idioms', d.id), d.data(), { merge: true });
+          }
+          iSnap = await getDocs(collection(db, 'spaces', targetSpace, 'idioms'));
+        }
+      }
       if (!iSnap.empty) {
         const cloudIdioms = iSnap.docs.map(d => d.data());
-        localStorage.setItem(STORAGE_KEYS.IDIOMS, JSON.stringify(cloudIdioms));
+        localStorage.setItem(`all4u_${targetSpace}_idioms`, JSON.stringify(cloudIdioms));
       }
-      // 5. 플레이리스트 동기화
-      const pSnap = await getDocs(collection(db, 'playlists'));
+
+      // 5. 플레이리스트 동기화 (spaces/{targetSpace}/playlists)
+      let pSnap = await getDocs(collection(db, 'spaces', targetSpace, 'playlists'));
+      if (pSnap.empty && targetSpace === 'space_master') {
+        const rootSnap = await getDocs(collection(db, 'playlists'));
+        if (!rootSnap.empty) {
+          for (const d of rootSnap.docs) {
+            await setDoc(doc(db, 'spaces', targetSpace, 'playlists', d.id), d.data(), { merge: true });
+          }
+          pSnap = await getDocs(collection(db, 'spaces', targetSpace, 'playlists'));
+        }
+      }
       if (!pSnap.empty) {
         const cloudPlaylists = pSnap.docs.map(d => d.data());
-        localStorage.setItem(STORAGE_KEYS.PLAYLISTS, JSON.stringify(cloudPlaylists));
+        localStorage.setItem(`all4u_${targetSpace}_playlists`, JSON.stringify(cloudPlaylists));
       }
     } catch (e) {
       console.debug('Cloud sync initial check:', e.message);
