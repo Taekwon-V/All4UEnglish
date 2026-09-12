@@ -13,36 +13,47 @@
   padding-bottom: 30px;
 }
 
-/* 8번 요구사항: 상단 고정 카테고리 탭 */
-.test-category-tabs {
+/* 8번 요구사항: 상단 고정 카테고리 탭 (전체 탭 100% 규격 통일) */
+.test-sticky-header {
   position: sticky;
   top: 0;
   z-index: 40;
   background: var(--bg-canvas, #faf7f2);
-  padding: 10px 0 10px;
+  padding: 0 0 8px;
+}
+
+.test-category-tabs {
   display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 16px;
   gap: 4px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .test-tab {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 9px 4px;
+  min-height: 40px;
   border-radius: 12px;
   border: none;
-  background: #f1f5f9;
-  font-size: 12.5px;
+  background: transparent;
+  font-size: 13px;
   font-weight: 700;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   white-space: nowrap;
 }
 
 .test-tab.active {
   background: #ffffff;
-  color: var(--primary-brand, #2d6a4f);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  color: #0f172a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .test-card {

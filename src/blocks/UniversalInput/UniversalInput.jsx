@@ -176,7 +176,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
         originalText: raw,
         translation: result.translation || translationText || "자연스러운 일상 영어 표현",
         source: activeMode === 'camera' ? '사진 인식' : activeMode === 'mic' ? '음성 녹음' : '직접 입력',
-        tags: ["일상"]
+        tags: ["주제없음"]
       });
       
       const newSentence = saved[0];

@@ -3,9 +3,17 @@
  * 1. 사진 OCR 텍스트 추출 (Vision)
  * 2. 문장 정밀 분석 및 [단어 / 문법 / 숙어] 자동 발굴
  * 3. 각 항목별 [새로운 실생활 예문 2~3개] 실시간 무한 생성
+ * 4. 모델 쿼터 초과 방지: gemini-flash-lite-latest -> gemini-3.5-flash-lite 다중 폴백 체인
  */
 
 const DEFAULT_KEY_B64 = 'QVEuQWI4Uk42S3dMd1hmc3c2QXFzQ2Z6UE1EX3RZZFBwZUJxZWdNZ3JpRjJpMlZwNXRQZXc=';
+
+// 가용성이 높고 쿼터 제한이 넉넉한 초경량 고속 모델 우선 순위 체인
+const CANDIDATE_MODELS = [
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash-lite',
+  'gemini-2.5-flash'
+];
 
 const getApiKey = () => {
   const local = typeof localStorage !== 'undefined' ? localStorage.getItem('ALL4U_GEMINI_API_KEY') : null;
@@ -20,6 +28,60 @@ const getApiKey = () => {
   }
 };
 
+/**
+ * 쿼터 초과(429) 및 일시적 장애를 자동 방어하는 다중 모델 Failover 호출기
+ */
+async function callGeminiApi(parts, { temperature = 0.2, responseMimeType = "application/json" } = {}) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('API Key is missing');
+
+  let lastError = null;
+  for (const model of CANDIDATE_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            temperature,
+            responseMimeType
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => response.statusText);
+        throw new Error(`[${model}] ${response.status}: ${errText}`);
+      }
+
+      const data = await response.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) throw new Error(`[${model}] Empty response`);
+
+      return rawText;
+    } catch (err) {
+      console.warn(`Gemini Model Failover (${model} -> next):`, err.message);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('All Gemini models failed');
+}
+
+// 자주 쓰이는 기본 단어 사전 맵 (네트워크 완전 단절 대비용)
+const COMMON_DICT_FALLBACK = {
+  busy: { pos: '형용사', meanings: ['바쁜', '분주한', '통화 중인'], nuance: '할 일이 많은 상태뿐 아니라 통화 중이거나 식당이 붐빌 때도 씁니다.' },
+  iced: { pos: '형용사', meanings: ['얼음을 넣은', '차가운', '설탕을 입힌'], nuance: '얼음을 띄운 시원한 음료를 말할 때 씁니다.' },
+  coffee: { pos: '명사', meanings: ['커피', '커피 한 잔'], nuance: '일상 대화에서 친근하게 쓰이는 음료 표현입니다.' },
+  order: { pos: '동사', meanings: ['주문하다', '명령하다', '정리하다'], nuance: '식당이나 카페에서 음식을 시킬 때 주로 쓰입니다.' },
+  time: { pos: '명사', meanings: ['시간', '때', '시기'], nuance: '시간이나 순간을 나타내는 기본 어휘입니다.' },
+  reluctant: { pos: '형용사', meanings: ['꺼리는', '주저하는', '내키지 않는'], nuance: '마음속에서 망설이며 조심스러워하는 느낌입니다.' },
+  cozy: { pos: '형용사', meanings: ['아늑한', '편안한', '포근한'], nuance: '따뜻하고 아늑하여 마음이 편안해지는 공간을 묘사합니다.' },
+  wondering: { pos: '동사', meanings: ['궁금해하다', '생각하다', '호기심을 갖다'], nuance: '상대방에게 정중하게 조심스러운 질문을 던질 때 씁니다.' }
+};
+
 export const GeminiService = {
   getApiKey,
   setApiKey: (key) => {
@@ -32,13 +94,10 @@ export const GeminiService = {
 
   /**
    * 사진(크롭된 영역)에서 영어 텍스트 및 한국어 번역 추출
-   * @param {string} base64Data - 'data:image/jpeg;base64,...' 포맷
    */
   extractTextFromImage: async (base64Data) => {
     const apiKey = getApiKey();
     if (!apiKey) {
-      console.warn('Gemini API 키 부재: OCR 시뮬레이션 데이터 반환');
-
       return {
         text: "The secret of getting ahead is getting started.",
         translation: "앞서가는 비결은 일단 시작하는 것이다."
@@ -59,29 +118,12 @@ export const GeminiService = {
 }
 `;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inlineData: { mimeType, data: cleanBase64 } }
-            ]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: "application/json"
-          }
-        })
-      });
+      const raw = await callGeminiApi([
+        { text: prompt },
+        { inlineData: { mimeType, data: cleanBase64 } }
+      ], { temperature: 0.1 });
 
-      if (!response.ok) throw new Error(`Gemini Vision Error: ${response.statusText}`);
-      const data = await response.json();
-      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      const parsed = JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
-      return parsed;
+      return JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
     } catch (e) {
       console.error('Vision OCR 에러:', e);
       return {
@@ -105,52 +147,53 @@ export const GeminiService = {
     }
 
     const prompt = `
-당신은 한국인 학습자를 위한 최고 수준의 다정하고 지혜로운 1:1 원어민 영어 튜터입니다.
-아래 사용자가 입력(또는 음성 인식/사진 추출)한 영어 문장을 분석해주세요.
+당신은 한국인 학습자를 위한 1:1 원어민 영어 튜터입니다.
+사용자가 입력한 영어 문장을 분석하여 순수 JSON으로만 응답하세요.
 
 [영어 문장]:
 "${sentence}"
 
 [핵심 분석 임무]:
 1. [오타 & 문법 & 원어민 뉘앙스 교정]
-   - 사용자가 입력한 문장에 오타, 스펠링 오류, 문법적 오류(수 일치, 시제 등), 또는 어색하거나 딱딱한 콩글리시 표현이 있는지 정밀하게 검토하세요.
-   - 교정이나 더 자연스러운 원어민 표현으로의 개선이 필요한 경우:
+   - 오타/문법 오류나 어색한 콩글리시가 있다면:
      * "hasCorrection": true
-     * "correctedSentence": "오타/문법을 교정하고 원어민이 일상에서 가장 자연스럽고 세련되게 사용하는 추천 문장"
-     * "correctionReason": "어떤 부분을 왜 고쳤는지 따뜻하고 이해하기 쉬운 1~2줄 한국어 설명 (예: 'got 대신 can I get을 사용하고 oat milk 표기를 바로잡아 원어민식 카페 주문 표현으로 다듬었어요')"
-   - 이미 문법적으로 오류가 없고 자연스러운 문장인 경우:
+     * "correctedSentence": "가장 자연스럽고 세련된 원어민 추천 문장"
+     * "correctionReason": "어떤 부분을 왜 고쳤는지 따뜻하고 직관적인 1줄 설명"
+   - 오류 없이 자연스러운 문장이라면:
      * "hasCorrection": false
      * "correctedSentence": "${sentence}"
      * "correctionReason": "오류 없이 완벽하고 자연스러운 문장입니다! ✨"
 2. [한국어 번역]:
-   - 최종 추천 문장에 맞는 매끄럽고 자연스러운 구어체 한국어 번역 ("translation")
-3. [단어/문법/숙어 추천 발굴]:
-   - 추천 문장(correctedSentence)에 담긴 핵심 단어(1~3개), 문법 패턴(1개), 숙어/표현(1~2개) 추출
+   - 문장에 맞는 매끄러운 구어체 한국어 번역 ("translation")
+3. [단어/문법/숙어 추출 규칙 - 절대 준수]:
+   - 추천 문장에서 핵심 단어 1~3개를 선정하세요.
+   - 각 단어의 "dictionaryMeanings"에는 해당 단어의 **실제 한국어 사전 대표 뜻 1~3개**(예: busy -> ["바쁜", "분주한", "통화 중인"], coffee -> ["커피"])를 정확히 작성하세요.
+   - "nuanceKo"에는 "문맥 속에서 감정을 전달하는..." 같은 **상투적이거나 억지스러운 일반론 문구를 절대 쓰지 마세요**. 일상에서 이 단어가 실제 쓰이는 느낌이나 실용적인 꿀팁 1줄만 적으세요. 없으면 빈 문자열("")로 두세요.
 
 [응답 JSON 규격]:
 {
   "hasCorrection": true,
   "correctedSentence": "자연스럽게 교정 및 추천된 영어 문장",
-  "correctionReason": "교정 이유 및 원어민 표현 팁 (한국어 1~2줄)",
+  "correctionReason": "교정 이유 (한국어 1줄)",
   "translation": "자연스럽고 매끄러운 한국어 번역",
   "suggestedWords": [
     {
-      "word": "단어 원형",
+      "word": "단어원형",
       "phonetic": "[발음기호]",
-      "partOfSpeech": "동사 / 명사 / 형용사 / 부사 등 품사 명시",
-      "dictionaryMeanings": ["1. 사전적 대표 뜻1", "2. 사전적 대표 뜻2", "3. 사전적 대표 뜻3"],
-      "nuanceKo": "단순 사전 뜻이 아닌 이 문맥 속 생생한 뉘앙스 해설"
+      "partOfSpeech": "형용사 / 동사 / 명사 / 부사 등",
+      "dictionaryMeanings": ["정확한 사전 뜻1", "사전 뜻2"],
+      "nuanceKo": "실전 활용 느낌 1줄 (억지 설명 금지)"
     }
   ],
   "suggestedGrammar": {
-    "pattern": "문법 패턴 공식 (예: Can I get + 명사?, be reluctant to + 동사원형)",
+    "pattern": "핵심 문법 패턴",
     "tag": "#패턴태그",
-    "explanation": "문법 용어 대신 말문이 트이도록 돕는 친절한 해설"
+    "explanation": "문법 해설 (1줄)"
   },
   "suggestedIdioms": [
     {
-      "idiom": "숙어 또는 관용 표현 (예: call it a day, figure out)",
-      "meaning": "한국어 뜻 및 뉘앙스 풀이"
+      "idiom": "숙어/관용구",
+      "meaning": "한국어 뜻"
     }
   ]
 }
@@ -158,57 +201,46 @@ export const GeminiService = {
 `;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: "application/json"
-          }
-        })
-      });
-
-      if (!response.ok) throw new Error(`Gemini API Error: ${response.statusText}`);
-      const data = await response.json();
-      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const raw = await callGeminiApi([{ text: prompt }], { temperature: 0.2 });
       const parsed = JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
 
-      // suggestedWords의 dictionaryMeanings 및 품사 필드 100% 보장
+      // suggestedWords의 dictionaryMeanings 및 품사 필드 보장
       if (parsed && Array.isArray(parsed.suggestedWords)) {
         parsed.suggestedWords = parsed.suggestedWords.map(w => {
           let meanings = w.dictionaryMeanings;
+          const cleanWord = (w.word || '').toLowerCase().trim();
+          const fallbackData = COMMON_DICT_FALLBACK[cleanWord];
+
           if (!Array.isArray(meanings) || meanings.length === 0) {
-            // nuanceKo 또는 meaningKo를 활용해 사전 뜻 배열 생성
-            const fallbackText = w.meaningKo || w.nuanceKo || w.word;
-            meanings = fallbackText.split(/[,/·\n]/).map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
-            if (meanings.length === 0) meanings = [fallbackText];
+            meanings = fallbackData ? fallbackData.meanings : [w.meaningKo || w.nuanceKo || w.word];
           }
-          // "1. 뜻" 형태의 번호 접두사 정리
+
           const cleanedMeanings = meanings.map(m => m.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+
+          let nuance = w.nuanceKo || '';
+          // 억지 일반론 문구 필터링
+          if (nuance.includes('감정과 의도') || nuance.includes('중요 어휘') || nuance.includes('문맥 속에서')) {
+            nuance = fallbackData ? fallbackData.nuance : '';
+          }
 
           return {
             ...w,
-            partOfSpeech: w.partOfSpeech || '단어',
-            dictionaryMeanings: cleanedMeanings.length > 0 ? cleanedMeanings.slice(0, 3) : [w.nuanceKo || '대표 의미']
+            partOfSpeech: w.partOfSpeech || (fallbackData ? fallbackData.pos : '단어'),
+            dictionaryMeanings: cleanedMeanings.length > 0 ? cleanedMeanings.slice(0, 3) : (fallbackData ? fallbackData.meanings : [w.word]),
+            nuanceKo: nuance
           };
         });
       }
 
       return parsed;
     } catch (e) {
-      console.warn('Gemini Discover Fallback 전환:', e);
+      console.warn('Gemini Discover Fallback 전환:', e.message);
       return GeminiService.fallbackDiscover(sentence);
     }
   },
 
   /**
-   * 단어장/문법장/숙어장에서 [새 예문 생성] 터치 시, 해당 항목을 활용한 2~3개의 새로운 실생활 예문 동적 생성
-   * @param {'grammar'|'idiom'|'word'} type
-   * @param {object} item - { pattern } or { idiom } or { word }
-   * @param {string} originalSentence - 원문 문장
+   * 실생활 예문 동적 생성
    */
   generateVariations: async (type, item, originalSentence = '') => {
     const targetName = item.pattern || item.idiom || item.word;
@@ -222,222 +254,170 @@ export const GeminiService = {
 
     const prompt = `
 당신은 일상 영어 회화 튜터입니다.
-주어진 학습 대상 [${type === 'word' ? '단어' : type === 'grammar' ? '문법 패턴' : '숙어/표현'}]을 직접 활용하여, 실제 원어민이 일상에서 사용하는 자연스럽고 세련된 실생활 영어 예문 3개와 자연스러운 한국어 번역을 만드세요.
+주어진 학습 대상 [${type === 'word' ? '단어' : type === 'grammar' ? '문법 패턴' : '숙어/표현'}]을 활용하여, 실제 원어민이 일상에서 사용하는 자연스럽고 세련된 실생활 영어 예문 3개와 자연스러운 한국어 번역을 만드세요.
 
 [학습 대상]: ${targetName} ${posHint}
 [의미/뉘앙스]: ${detailHint}
 [참고 원문]: ${originalSentence || '없음'}
 
-[핵심 규칙 - 절대 준수]:
-1. 대상 단어/표현을 따옴표(" ")로 감싸서 언급하거나, 단어 자체에 대해 이야기하는 메타 문장(예: I practiced "${targetName}", Using "${targetName}" is good 등)은 절대로 작성하지 마십시오.
-2. 반드시 해당 단어/표현이 문장의 주어/동사/목적어/보어/수식어 등으로 실제 사용된 생활 대화/독백 문장이어야 합니다.
-   (좋은 예: She was reluctant to leave the party. / He was reluctant to admit his mistake.)
-3. 카페, 식당, 쇼핑, 직장, 가족, 여행, 감정 표현 등 일상 생활에서 입 밖으로 내뱉기 좋은 생생하고 현대적인 표현이어야 합니다.
-4. 한국어 번역도 대상 단어를 따옴표로 감싸서 설명조로 쓰지 말고, 자연스러운 구어체로 번역하십시오.
+[핵심 규칙]:
+1. 대상 단어/표현을 따옴표로 언급하는 메타 문장 금지. 주어/동사/목적어 등으로 실제 사용된 생활 대화 문장이어야 합니다.
+2. 카페, 식당, 쇼핑, 직장, 가족, 여행 등 일상에서 바로 쓸 수 있는 세련된 표현.
 
 [응답 JSON 규격]:
 {
   "variations": [
-    {
-      "en": "자연스럽게 활용된 영어 예문 1",
-      "ko": "자연스러운 한국어 번역 1"
-    },
-    {
-      "en": "자연스럽게 활용된 영어 예문 2",
-      "ko": "자연스러운 한국어 번역 2"
-    },
-    {
-      "en": "자연스럽게 활용된 영어 예문 3",
-      "ko": "자연스러운 한국어 번역 3"
-    }
+    { "en": "실제 활용 영어 예문 1", "ko": "자연스러운 한국어 번역 1" },
+    { "en": "실제 활용 영어 예문 2", "ko": "자연스러운 한국어 번역 2" },
+    { "en": "실제 활용 영어 예문 3", "ko": "자연스러운 한국어 번역 3" }
   ]
 }
 마크다운 백틱 없이 순수 JSON만 반환하세요.
 `;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7, // 신선하고 생생한 예문
-            responseMimeType: "application/json"
-          }
-        })
-      });
-
-      if (!response.ok) throw new Error(`Gemini API Error: ${response.statusText}`);
-      const data = await response.json();
-      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const raw = await callGeminiApi([{ text: prompt }], { temperature: 0.7 });
       const parsed = JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
       return parsed.variations || [];
     } catch (e) {
-      console.warn('Gemini Variations Fallback 전환:', e);
+      console.warn('Gemini Variations Fallback 전환:', e.message);
       return GeminiService.fallbackVariations(type, targetName);
     }
   },
 
-  // Fallback 생성기들
-  fallbackDiscover: (sentence) => {
-    const words = sentence.split(/\s+/).filter(w => w.length >= 4);
-    const primary = words[0] ? words[0].replace(/[^a-zA-Z]/g, '') : 'wondering';
-    return {
-      hasCorrection: false,
-      correctedSentence: sentence,
-      correctionReason: "완벽하고 자연스러운 표현입니다! ✨",
-      translation: "이 문장은 자연스러운 일상 회화 표현입니다.",
-      suggestedWords: [
-        {
-          word: primary,
-          phonetic: `[${primary.toLowerCase()}]`,
-          partOfSpeech: "단어",
-          dictionaryMeanings: ["궁금해하다", "호기심을 갖다", "놀라워하다"],
-          nuanceKo: "문맥 속에서 감정과 의도를 전달하는 중요 어휘"
-        }
-      ],
-      suggestedGrammar: {
-        pattern: `${sentence.slice(0, 24)}... 패턴`,
-        tag: "#실전_문장패턴",
-        explanation: "원어민들이 일상에서 자연스럽게 자주 쓰는 핵심 구문입니다."
-      },
-      suggestedIdioms: [
-        {
-          idiom: "take time",
-          meaning: "시간을 내다, 서두르지 않고 여유를 가지다"
-        }
-      ]
-    };
-  },
-
   /**
-   * 사용자가 직접 입력한 단어/문법/숙어 표현에 대해
-   * AI로 품사, 사전적 의미 3개, 뉘앙스/설명, 예문을 원터치 자동 완성
+   * 사용자가 직접 입력하거나 터치한 단어/문법/숙어 표현에 대해
+   * 사전적 대표 의미 3개, 품사, 예문 조회
    */
   lookupExpression: async (type, expression) => {
     if (!expression || !expression.trim()) return null;
-    const apiKey = getApiKey();
     const cleanExpr = expression.trim();
+    const lower = cleanExpr.toLowerCase();
 
+    // 로컬 기본 사전이 있으면 우선 조회
+    const localWord = COMMON_DICT_FALLBACK[lower];
+
+    const apiKey = getApiKey();
     if (!apiKey) {
       if (type === 'word') {
         return {
-          partOfSpeech: '동사',
-          dictionaryMeanings: ['달성하다', '성취하다', '이루다'],
-          nuanceKo: `${cleanExpr}에 대한 원어민식 자연스러운 뉘앙스와 활용법입니다.`,
+          partOfSpeech: localWord ? localWord.pos : '단어',
+          dictionaryMeanings: localWord ? localWord.meanings : [cleanExpr],
+          nuanceKo: localWord ? localWord.nuance : '',
           phonetic: '',
-          sampleSentence: `I am trying to ${cleanExpr} my goals step by step.`
+          sampleSentence: `I am familiar with the word ${cleanExpr}.`
         };
       } else if (type === 'grammar') {
         return {
-          tag: 'to+V',
-          explanation: `${cleanExpr} 구문은 일상 회화에서 자주 쓰이는 핵심 문법 패턴입니다.`,
-          sampleSentence: `You should be ready to ${cleanExpr} when the time comes.`
+          tag: '문법패턴',
+          explanation: `${cleanExpr} 구문 패턴입니다.`,
+          sampleSentence: `You can use ${cleanExpr} in everyday conversations.`
         };
       } else {
         return {
-          roleTag: '동사구',
-          meaning: `${cleanExpr}에 해당하는 자연스러운 숙어 표현 뜻입니다.`,
-          sampleSentence: `It helped us ${cleanExpr} much more effectively.`
+          roleTag: '숙어',
+          meaning: `${cleanExpr} 숙어 표현입니다.`,
+          sampleSentence: `It helped us ${cleanExpr} effectively.`
         };
       }
     }
 
     const prompt = `
-당신은 한국인을 위한 최고 수준의 영어 튜터입니다.
-사용자가 직접 서재에 등록하려는 영어 표현: "${cleanExpr}" (유형: ${type})에 대해 사전적/문법적 정보를 분석하여 아래 JSON으로 반환하세요.
+당신은 한국인을 위한 영어 사전 튜터입니다.
+표현: "${cleanExpr}" (유형: ${type})에 대해 정확한 한국어 사전 정보를 JSON으로 반환하세요.
 
-[유형별 반환 JSON 스키마]:
+[유형별 반환 규격]:
 ${type === 'word' ? `
 {
-  "partOfSpeech": "동사 / 명사 / 형용사 / 부사 중 가장 대표적인 품사 1개",
-  "dictionaryMeanings": ["대표 사전 의미 1", "대표 사전 의미 2", "대표 사전 의미 3"],
-  "nuanceKo": "원어민이 실제로 쓸 때의 느낌과 활용 뉘앙스를 따뜻하고 친절하게 설명 (1~2줄)",
+  "partOfSpeech": "명사 / 동사 / 형용사 / 부사 등 가장 대표적인 품사 1개",
+  "dictionaryMeanings": ["가장 정확한 한국어 대표 사전 뜻 1", "사전 뜻 2", "사전 뜻 3"],
+  "nuanceKo": "실생활에서 이 단어를 쓸 때 알아두면 좋은 1줄 꿀팁 (상투적인 억지 설명 절대 금지)",
   "phonetic": "/발음기호/",
-  "sampleSentence": "이 단어가 쓰인 자연스러운 실생활 영어 예문 1개"
+  "sampleSentence": "이 단어가 자연스럽게 쓰인 일상 대화 예문 1개"
 }
 ` : type === 'grammar' ? `
 {
-  "tag": "to+V / P.P. / V-ing / 조동사+V / 접속·가정 / 수동태 / 비교급 중 가장 적절한 구문 결합 형태 1개",
-  "explanation": "이 문법 패턴이 문장에서 쓰이는 핵심 규칙과 뉘앙스를 1~2줄로 친절하게 설명",
-  "sampleSentence": "이 문법 패턴이 쓰인 자연스러운 실생활 영어 예문 1개"
+  "tag": "to+V / P.P. / V-ing / 조동사+V 중 적절한 형태",
+  "explanation": "이 패턴이 쓰이는 핵심 규칙 (1줄)",
+  "sampleSentence": "자연스러운 예문 1개"
 }
 ` : `
 {
-  "roleTag": "동사구 / 형용사구 / 부사구 / 전치사구 / 대화 관용구 중 가장 적절한 구문 역할 1개",
-  "meaning": "이 숙어의 실제 일상 대화에서의 정확한 한국어 뜻",
-  "sampleSentence": "이 숙어가 쓰인 자연스러운 실생활 영어 예문 1개"
+  "roleTag": "동사구 / 형용사구 / 전치사구 등",
+  "meaning": "실제 일상 대화에서의 정확한 한국어 뜻",
+  "sampleSentence": "자연스러운 예문 1개"
 }
 `}
 오직 JSON만 응답하세요.
 `;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: "application/json"
-          }
-        })
-      });
+      const raw = await callGeminiApi([{ text: prompt }], { temperature: 0.1 });
+      const parsed = JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
 
-      if (!response.ok) throw new Error(`Gemini Error: ${response.statusText}`);
-      const data = await response.json();
-      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      return JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
+      // 억지 일반론 문구 정제
+      if (parsed && parsed.nuanceKo) {
+        if (parsed.nuanceKo.includes('감정과 의도') || parsed.nuanceKo.includes('중요 어휘') || parsed.nuanceKo.includes('문맥 속에서')) {
+          parsed.nuanceKo = localWord ? localWord.nuance : '';
+        }
+      }
+      return parsed;
     } catch (e) {
-      console.error('lookupExpression 에러:', e);
+      console.error('lookupExpression 에러:', e.message);
+      if (type === 'word') {
+        return {
+          partOfSpeech: localWord ? localWord.pos : '단어',
+          dictionaryMeanings: localWord ? localWord.meanings : [cleanExpr],
+          nuanceKo: localWord ? localWord.nuance : '',
+          phonetic: '',
+          sampleSentence: `Let's practice using "${cleanExpr}".`
+        };
+      }
       return null;
     }
+  },
+
+  // Fallback 생성기 (억지 상투적 문구 전면 제거)
+  fallbackDiscover: (sentence) => {
+    const words = sentence.split(/\s+/).filter(w => w.length >= 3);
+    const primary = words[0] ? words[0].replace(/[^a-zA-Z]/g, '') : 'busy';
+    const lower = primary.toLowerCase();
+    const local = COMMON_DICT_FALLBACK[lower] || { pos: '단어', meanings: [primary], nuance: '' };
+
+    return {
+      hasCorrection: false,
+      correctedSentence: sentence,
+      correctionReason: "자연스러운 표현입니다! ✨",
+      translation: "일상 영어 표현입니다.",
+      suggestedWords: [
+        {
+          word: primary,
+          phonetic: `[${primary.toLowerCase()}]`,
+          partOfSpeech: local.pos,
+          dictionaryMeanings: local.meanings,
+          nuanceKo: local.nuance
+        }
+      ],
+      suggestedGrammar: {
+        pattern: `${sentence.slice(0, 20)}... 패턴`,
+        tag: "#회화패턴",
+        explanation: "일상에서 자주 쓰이는 핵심 문장 형태입니다."
+      },
+      suggestedIdioms: []
+    };
   },
 
   fallbackVariations: (type, targetName) => {
     const clean = (targetName || '').replace(/["']/g, '').trim();
     if (type === 'word') {
       return [
-        {
-          en: `She seemed somewhat ${clean} to leave the gathering so early.`,
-          ko: `그녀는 그렇게 일찍 자리를 뜨는 것을 다소 주저하는 듯했습니다.`
-        },
-        {
-          en: `You don't need to be ${clean} to ask questions whenever you feel lost.`,
-          ko: `이해하기 어려울 때마다 질문하는 것을 망설이거나 어려워할 필요 없습니다.`
-        },
-        {
-          en: `They were initially ${clean}, but decided to accept the proposal in the end.`,
-          ko: `처음에는 약간 꺼려했으나, 결국에는 제안을 받아들이기로 했습니다.`
-        }
-      ];
-    } else if (type === 'grammar') {
-      return [
-        {
-          en: `I was reluctant to bring it up during the meeting, but it was necessary.`,
-          ko: `회의 중에 그 이야기를 꺼내기가 망설여졌지만, 꼭 필요한 말이었습니다.`
-        },
-        {
-          en: `Don't be hesitant to try new opportunities when they come along.`,
-          ko: `새로운 기회가 찾아왔을 때 시도해 보는 것을 주저하지 마세요.`
-        }
+        { en: `I am quite ${clean} right now, but I can help you later.`, ko: `지금은 꽤 바쁘지만, 나중에 도와드릴 수 있어요.` },
+        { en: `Is the line ${clean} at the moment?`, ko: `지금 통화 중인가요?` }
       ];
     } else {
       return [
-        {
-          en: `We finally managed to figure out the best way to handle this situation.`,
-          ko: `우리는 마침내 이 상황을 해결할 가장 좋은 방법을 찾아냈습니다.`
-        },
-        {
-          en: `It took a few days to figure out all the little details of the schedule.`,
-          ko: `일정의 사소한 세부사항들을 모두 파악하는 데 며칠이 걸렸습니다.`
-        }
+        { en: `It took a few days to figure it out.`, ko: `그것을 파악하는 데 며칠이 걸렸습니다.` }
       ];
     }
   }
 };
-

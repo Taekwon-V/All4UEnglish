@@ -49,9 +49,10 @@ export default function SentenceManager({ onPlayPlaylist }) {
     loadData();
   }, []);
 
-  // 전체 문장에서 사용자가 등록한 모든 고유 주제(태그) 목록 추출
+  // 전체 문장에서 사용자가 등록한 모든 고유 주제(태그) 목록 추출 (기본 주제 '주제없음' 포함)
   const allExistingTopics = useMemo(() => {
     const set = new Set();
+    set.add('주제없음');
     sentences.forEach(s => {
       if (Array.isArray(s.tags)) {
         s.tags.forEach(t => {
@@ -82,7 +83,10 @@ export default function SentenceManager({ onPlayPlaylist }) {
         return matchSearch && !!s.isBookmarked;
       }
       if (filterMode === 'tag' && selectedTopic !== 'all') {
-        const hasTopic = s.tags && s.tags.some(t => t.replace(/^#/, '') === selectedTopic);
+        const currentTags = (Array.isArray(s.tags) && s.tags.length > 0)
+          ? s.tags.map(t => t.replace(/^#/, '').trim())
+          : ['주제없음'];
+        const hasTopic = currentTags.includes(selectedTopic);
         return matchSearch && hasTopic;
       }
       return matchSearch;
@@ -200,10 +204,11 @@ export default function SentenceManager({ onPlayPlaylist }) {
     if (!cleanTag) return;
     const target = sentences.find(s => s.id === sentenceId);
     if (!target) return;
-    const currentTags = Array.isArray(target.tags) ? target.tags : [];
-    if (!currentTags.some(t => t.replace(/^#/, '') === cleanTag)) {
-      const updatedTags = [...currentTags, cleanTag];
-      const updated = StorageService.updateSentence(sentenceId, { tags: updatedTags });
+    let currentTags = Array.isArray(target.tags) ? target.tags.map(t => t.replace(/^#/, '').trim()) : [];
+    currentTags = currentTags.filter(t => t !== '주제없음');
+    if (!currentTags.includes(cleanTag)) {
+      currentTags.push(cleanTag);
+      const updated = StorageService.updateSentence(sentenceId, { tags: currentTags });
       setSentences(updated);
     }
     setNewTagInputs(prev => ({ ...prev, [sentenceId]: '' }));
@@ -213,9 +218,12 @@ export default function SentenceManager({ onPlayPlaylist }) {
   const handleRemoveTag = (sentenceId, tagToRemove) => {
     const target = sentences.find(s => s.id === sentenceId);
     if (!target) return;
-    const currentTags = Array.isArray(target.tags) ? target.tags : [];
-    const updatedTags = currentTags.filter(t => t.replace(/^#/, '') !== tagToRemove.replace(/^#/, ''));
-    const updated = StorageService.updateSentence(sentenceId, { tags: updatedTags });
+    let currentTags = Array.isArray(target.tags) ? target.tags.map(t => t.replace(/^#/, '').trim()) : [];
+    currentTags = currentTags.filter(t => t !== tagToRemove.replace(/^#/, '').trim());
+    if (currentTags.length === 0) {
+      currentTags = ['주제없음'];
+    }
+    const updated = StorageService.updateSentence(sentenceId, { tags: currentTags });
     setSentences(updated);
   };
 
@@ -275,8 +283,10 @@ export default function SentenceManager({ onPlayPlaylist }) {
     const isExpanded = !!expandedIds[item.id];
     const shortMonth = formatShortMonth(item.createdAt);
     const dateDisplay = formatDate(item.createdAt);
-    const tagList = Array.isArray(item.tags) ? item.tags : [];
-    const unusedTopics = allExistingTopics.filter(t => !tagList.some(cur => cur.replace(/^#/, '') === t));
+    const tagList = (Array.isArray(item.tags) && item.tags.length > 0)
+      ? item.tags.map(t => t.replace(/^#/, '').trim())
+      : ['주제없음'];
+    const unusedTopics = allExistingTopics.filter(t => t !== '주제없음' && !tagList.includes(t));
     const varData = variationsState[item.id];
 
     return (
@@ -367,57 +377,48 @@ export default function SentenceManager({ onPlayPlaylist }) {
               </button>
             </div>
 
-            {/* 주제(태그) 관리 섹션 */}
+            {/* 주제(태그) 관리 섹션: 군더더기 텍스트 제거 및 직관적 선택/추가 */}
             <div className="sentence-topic-manager">
-              <div className="topic-header-row">
-                <div className="topic-title">
-                  <Tag size={13} />
-                  <span>주제 태그 관리:</span>
+              <div className="topic-header-simple">
+                <div className="topic-header-left">
+                  <Tag size={13} color="#64748b" />
+                  <span className="topic-simple-title">주제:</span>
                 </div>
-                <span className="topic-guide">사용자 주제를 고르거나 새로 추가할 수 있습니다.</span>
-              </div>
-
-              {/* 현재 지정된 태그 목록 */}
-              <div className="current-tags-wrap">
-                {tagList.length === 0 ? (
-                  <span className="no-tags-notice">지정된 주제가 없습니다.</span>
-                ) : (
-                  tagList.map((tag, tIdx) => {
-                    const clean = tag.replace(/^#/, '');
+                <div className="current-tags-wrap">
+                  {tagList.map((tag, tIdx) => {
+                    const isDefault = tag === '주제없음';
                     return (
-                      <span key={tIdx} className="topic-pill current">
-                        #{clean}
-                        <button 
-                          type="button" 
-                          className="tag-remove-btn" 
-                          onClick={() => handleRemoveTag(item.id, clean)}
-                          title="태그 삭제"
-                        >
-                          <X size={11} />
-                        </button>
+                      <span key={tIdx} className={`topic-pill ${isDefault ? 'default' : 'current'}`}>
+                        #{tag}
+                        {!isDefault && (
+                          <button 
+                            type="button" 
+                            className="tag-remove-btn" 
+                            onClick={() => handleRemoveTag(item.id, tag)}
+                            title="삭제"
+                          >
+                            <X size={11} />
+                          </button>
+                        )}
                       </span>
                     );
-                  })
-                )}
+                  })}
+                </div>
               </div>
 
-              {/* 내가 이미 사용한 주제 중에서 선택 */}
+              {/* 기존 사용한 주제 원클릭 선택 (있을 때만) */}
               {unusedTopics.length > 0 && (
-                <div className="existing-topics-selector">
-                  <span className="sub-label">기존 주제 선택:</span>
-                  <div className="topic-chip-picker">
-                    {unusedTopics.map(t => (
-                      <button 
-                        key={t}
-                        type="button" 
-                        className="topic-pill selectable"
-                        onClick={() => handleAddTag(item.id, t)}
-                        title={`'#${t}' 추가`}
-                      >
-                        + #{t}
-                      </button>
-                    ))}
-                  </div>
+                <div className="topic-chip-picker">
+                  {unusedTopics.map(t => (
+                    <button 
+                      key={t}
+                      type="button" 
+                      className="topic-pill selectable"
+                      onClick={() => handleAddTag(item.id, t)}
+                    >
+                      + #{t}
+                    </button>
+                  ))}
                 </div>
               )}
 
@@ -425,7 +426,7 @@ export default function SentenceManager({ onPlayPlaylist }) {
               <div className="new-tag-input-row">
                 <input 
                   type="text" 
-                  placeholder="새 주제 입력 (예: 비즈니스, 카페, 여행)..."
+                  placeholder="새 주제 입력..."
                   value={newTagInputs[item.id] || ''}
                   onChange={(e) => setNewTagInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
                   onKeyDown={(e) => {
@@ -441,7 +442,7 @@ export default function SentenceManager({ onPlayPlaylist }) {
                   className="tag-add-btn"
                   onClick={() => handleAddTag(item.id, newTagInputs[item.id])}
                 >
-                  주제 추가
+                  추가
                 </button>
               </div>
             </div>
@@ -493,34 +494,36 @@ export default function SentenceManager({ onPlayPlaylist }) {
 
   return (
     <div className="sentence-manager-container">
-      {/* 1. 상단 3단 메인 세그먼트 */}
-      <div className="section-segment-bar">
-        <button 
-          type="button" 
-          className={`segment-btn ${activeSection === 'learning' ? 'active' : ''}`}
-          onClick={() => setActiveSection('learning')}
-        >
-          <BookOpen size={15} />
-          <span>학습 중 ({sentences.filter(s => s.status !== 'mastered').length})</span>
-        </button>
+      {/* 1. 상단 3단 메인 세그먼트 (상단 여백 및 탭 디자인 통일) */}
+      <div className="sentence-sticky-header">
+        <div className="section-segment-bar">
+          <button 
+            type="button" 
+            className={`segment-btn ${activeSection === 'learning' ? 'active' : ''}`}
+            onClick={() => setActiveSection('learning')}
+          >
+            <BookOpen size={15} />
+            <span>학습 중 ({sentences.filter(s => s.status !== 'mastered').length})</span>
+          </button>
 
-        <button 
-          type="button" 
-          className={`segment-btn ${activeSection === 'mastered' ? 'active' : ''}`}
-          onClick={() => setActiveSection('mastered')}
-        >
-          <CheckCircle2 size={15} />
-          <span>학습 완료 ({masteredCount})</span>
-        </button>
+          <button 
+            type="button" 
+            className={`segment-btn ${activeSection === 'mastered' ? 'active' : ''}`}
+            onClick={() => setActiveSection('mastered')}
+          >
+            <CheckCircle2 size={15} />
+            <span>학습 완료 ({masteredCount})</span>
+          </button>
 
-        <button 
-          type="button" 
-          className={`segment-btn ${activeSection === 'playlists' ? 'active' : ''}`}
-          onClick={() => setActiveSection('playlists')}
-        >
-          <FolderPlus size={15} />
-          <span>플레이리스트 ({playlists.length})</span>
-        </button>
+          <button 
+            type="button" 
+            className={`segment-btn ${activeSection === 'playlists' ? 'active' : ''}`}
+            onClick={() => setActiveSection('playlists')}
+          >
+            <FolderPlus size={15} />
+            <span>플레이리스트 ({playlists.length})</span>
+          </button>
+        </div>
       </div>
 
       {/* 학습 진척도 게이지 바 */}

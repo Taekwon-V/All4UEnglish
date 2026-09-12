@@ -8,15 +8,22 @@
   padding-bottom: 24px;
 }
 
-/* 1. 상단 3단 메인 세그먼트 바 (스티키 고정) */
-.section-segment-bar {
+/* 1. 상단 3단 메인 세그먼트 바 (전체 탭 100% 규격 통일) */
+.sentence-sticky-header {
   position: sticky;
   top: 0;
   z-index: 40;
-  display: flex;
   background: var(--bg-canvas, #faf7f2);
-  padding: 8px 2px;
+  padding: 0 0 8px;
+}
+
+.section-segment-bar {
+  display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 16px;
   gap: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .segment-btn {
@@ -25,7 +32,8 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 6px;
+  padding: 9px 4px;
+  min-height: 40px;
   border-radius: 12px;
   border: none;
   background: transparent;
@@ -433,64 +441,76 @@
   padding: 8px 10px;
 }
 
-/* 7. 주제 태그 관리 섹션 */
+/* 7. 주제 태그 관리 섹션 (군더더기 없는 슬림 디자인) */
 .sentence-topic-manager {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 12px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.topic-header-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.topic-title {
+.topic-header-simple {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #334155;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.topic-guide {
-  font-size: 11px;
-  color: #94a3b8;
+.topic-header-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.topic-simple-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
 }
 
 .current-tags-wrap {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  min-height: 24px;
-}
-
-.no-tags-notice {
-  font-size: 12px;
-  color: #94a3b8;
-  font-style: italic;
+  gap: 4px;
 }
 
 .topic-pill {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: 3px 8px;
+  border-radius: 6px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+}
+
+.topic-pill.default {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
 }
 
 .topic-pill.current {
   background: #ecfdf5;
   color: #065f46;
   border: 1px solid #a7f3d0;
+}
+
+.topic-pill.selectable {
+  background: #ffffff;
+  color: #475569;
+  border: 1px dashed #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.topic-pill.selectable:hover {
+  background: #ecfdf5;
+  border-color: #059669;
+  color: #059669;
 }
 
 .tag-remove-btn {
@@ -501,45 +521,12 @@
   display: flex;
   align-items: center;
   padding: 1px;
-  border-radius: 50%;
-}
-
-.tag-remove-btn:hover {
-  background: #d1fae5;
-}
-
-.existing-topics-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-top: 4px;
-  border-top: 1px dashed #f1f5f9;
-}
-
-.sub-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #64748b;
 }
 
 .topic-chip-picker {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-}
-
-.topic-pill.selectable {
-  background: #f8fafc;
-  color: #475569;
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.topic-pill.selectable:hover {
-  background: #ecfdf5;
-  border-color: #10b981;
-  color: #059669;
 }
 
 .new-tag-input-row {

@@ -220,29 +220,31 @@ export default function RetentionTest() {
 
   return (
     <div className="retention-test-container">
-      {/* 8번 요구사항: 상단 고정 카테고리 탭 */}
-      <div className="test-category-tabs">
-        <button 
-          type="button" 
-          className={`test-tab ${testCategory === 'sentences' ? 'active' : ''}`}
-          onClick={() => setTestCategory('sentences')}
-        >
-          🧩 문장 순서배열
-        </button>
-        <button 
-          type="button" 
-          className={`test-tab ${testCategory === 'idioms' ? 'active' : ''}`}
-          onClick={() => setTestCategory('idioms')}
-        >
-          🧩 숙어 순서배열
-        </button>
-        <button 
-          type="button" 
-          className={`test-tab ${testCategory === 'words' ? 'active' : ''}`}
-          onClick={() => setTestCategory('words')}
-        >
-          📝 단어 암기
-        </button>
+      {/* 8번 요구사항: 상단 고정 카테고리 탭 (상단 여백 및 탭 디자인 통일) */}
+      <div className="test-sticky-header">
+        <div className="test-category-tabs">
+          <button 
+            type="button" 
+            className={`test-tab ${testCategory === 'sentences' ? 'active' : ''}`}
+            onClick={() => setTestCategory('sentences')}
+          >
+            🧩 문장 순서배열
+          </button>
+          <button 
+            type="button" 
+            className={`test-tab ${testCategory === 'idioms' ? 'active' : ''}`}
+            onClick={() => setTestCategory('idioms')}
+          >
+            🧩 숙어 순서배열
+          </button>
+          <button 
+            type="button" 
+            className={`test-tab ${testCategory === 'words' ? 'active' : ''}`}
+            onClick={() => setTestCategory('words')}
+          >
+            🎯 단어 퀴즈
+          </button>
+        </div>
       </div>
 
       {isCompleted ? (

@@ -218,20 +218,40 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
     setIsAddModalOpen(false);
   };
 
-  // 단어에 대한 사전적 대표 의미 / 품사 보완 헬퍼
+  // 단어에 대한 사전적 대표 의미 / 품사 보완 및 오염 데이터 자동 치유 헬퍼
   const getEnrichedWord = (w) => {
     let dictMeanings = w.dictionaryMeanings;
     let pos = w.partOfSpeech;
-    
-    if ((!dictMeanings || dictMeanings.length === 0) && w.word?.toLowerCase() === 'achieve') {
+    let nuance = w.nuanceKo || '';
+    const lower = (w.word || '').toLowerCase().trim();
+
+    // 1. 억지 상투적 문구 제거
+    if (nuance.includes('감정과 의도') || nuance.includes('중요 어휘') || nuance.includes('문맥 속에서')) {
+      nuance = '';
+    }
+
+    // 2. 오염된 잘못된 사전 뜻('궁금해하다') 치유 및 정확한 사전 뜻 배정
+    if (lower === 'busy') {
+      dictMeanings = ["바쁜", "분주한", "통화 중인"];
+      pos = "형용사";
+      nuance = "할 일이 많은 상태뿐 아니라 식당이 붐비거나 통화 중일 때도 쓰입니다.";
+    } else if (lower === 'iced') {
+      dictMeanings = ["얼음을 넣은", "차가운", "설탕을 입힌"];
+      pos = "형용사";
+      nuance = "얼음을 띄워 차갑게 만든 시원한 음료에 주로 쓰입니다.";
+    } else if (lower === 'achieve') {
       dictMeanings = ["달성하다", "성취하다", "이루어 내다"];
-      pos = pos || "동사";
+      pos = "동사";
+    } else if (dictMeanings && dictMeanings.some(m => m.includes('궁금해하다')) && lower !== 'wondering') {
+      // 잘못 복사된 더미 뜻 제거
+      dictMeanings = [w.word];
     }
 
     return {
       ...w,
       dictionaryMeanings: dictMeanings || [],
-      partOfSpeech: pos || '단어'
+      partOfSpeech: pos || '단어',
+      nuanceKo: nuance
     };
   };
 

@@ -384,7 +384,7 @@ export default function App() {
         display: 'flex', 
         flexDirection: 'column', 
         overflowY: 'auto', 
-        padding: '0 16px 8px',
+        padding: '10px 16px 8px',
         paddingBottom: 'calc(var(--safe-bottom, 14px) + 72px)',
         overscrollBehaviorY: 'contain'
       }}>

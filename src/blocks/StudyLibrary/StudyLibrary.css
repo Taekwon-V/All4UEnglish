@@ -19,11 +19,10 @@
   top: 0;
   z-index: 40;
   background: var(--bg-canvas, #faf7f2);
-  padding: 10px 0 10px;
+  padding: 0 0 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 /* 3단 상단 탭 */
@@ -33,7 +32,7 @@
   padding: 4px;
   border-radius: 16px;
   gap: 4px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .lib-tab {
@@ -43,6 +42,7 @@
   justify-content: center;
   gap: 6px;
   padding: 9px 4px;
+  min-height: 40px;
   border-radius: 12px;
   border: none;
   background: transparent;

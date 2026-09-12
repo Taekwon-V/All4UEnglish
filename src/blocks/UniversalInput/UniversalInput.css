@@ -5,7 +5,7 @@
   width: 100%;
   max-width: 520px;
   margin: 0 auto;
-  padding-top: 14px;
+  padding-top: 0;
   padding-bottom: 24px;
 }
 
@@ -22,11 +22,12 @@
   letter-spacing: -0.4px;
 }
 
-/* 빠른 3대 액션 버튼 바 */
+/* 빠른 3대 액션 버튼 바 (상단 규격 통일) */
 .input-quick-actions-bar {
   display: flex;
   gap: 8px;
   width: 100%;
+  padding: 0 0 8px;
 }
 
 .quick-action-pill {
@@ -35,15 +36,16 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 6px;
+  padding: 9px 6px;
+  min-height: 40px;
   border-radius: 12px;
   border: 1.5px solid #e2e8f0;
   background: #ffffff;
   color: #334155;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
   transition: all 0.18s ease;
 }
 
