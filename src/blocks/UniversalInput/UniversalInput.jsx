@@ -180,13 +180,9 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
         />
       )}
 
-      {/* 헤더 & 가이드 */}
+      {/* 컴팩트 헤더 */}
       <div className="universal-header">
         <h2 className="title">오늘의 문장 담기</h2>
-        <p className="subtitle">
-          공부한 책을 찍거나, 말하거나, 편하게 입력하세요.<br />
-          AI가 단어, 문법, 숙어를 쏙쏙 골라 보관함으로 보내드립니다.
-        </p>
       </div>
 
       {/* 3대 입력 모드 세그먼트 버튼 */}
@@ -199,8 +195,8 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
             fileInputRef.current?.click();
           }}
         >
-          <Camera size={18} />
-          <span>사진 영역 지정</span>
+          <Camera size={16} />
+          <span>사진 인식</span>
         </button>
 
         <button 
@@ -208,8 +204,8 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
           className={`mode-tab ${activeMode === 'mic' ? 'active' : ''}`}
           onClick={() => setActiveMode('mic')}
         >
-          <Mic size={18} />
-          <span>음성으로 말하기</span>
+          <Mic size={16} />
+          <span>음성</span>
         </button>
 
         <button 
@@ -217,8 +213,8 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
           className={`mode-tab ${activeMode === 'type' ? 'active' : ''}`}
           onClick={() => setActiveMode('type')}
         >
-          <Edit3 size={18} />
-          <span>직접 타이핑</span>
+          <Edit3 size={16} />
+          <span>직접 입력</span>
         </button>
       </div>
 
@@ -232,31 +228,29 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
         onChange={handleFileChange}
       />
 
-      {/* 모드별 인터랙션 패널 */}
+      {/* 모드별 컴팩트 트리거 */}
       {activeMode === 'camera' && !inputText && (
-        <div className="camera-trigger-card" onClick={() => fileInputRef.current?.click()}>
-          <div className="camera-icon-bubble">
-            <Camera size={32} />
-          </div>
-          <h4>책이나 화면 사진을 찍어주세요</h4>
-          <p>사진을 올린 뒤 원하는 문장을 네모로 쓱 드래그하면 끝!</p>
-          <span className="action-hint">터치하여 카메라/앨범 열기</span>
-        </div>
+        <button 
+          type="button" 
+          className="compact-camera-trigger" 
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Camera size={18} />
+          <span>사진 촬영 또는 앨범에서 선택</span>
+        </button>
       )}
 
       {activeMode === 'mic' && (
-        <div className="mic-trigger-box">
+        <div className="compact-mic-box">
           <button 
             type="button" 
-            className={`mic-circle-btn ${isListening ? 'listening' : ''}`}
+            className={`mic-pill-btn ${isListening ? 'listening' : ''}`}
             onClick={toggleListening}
           >
-            <Mic size={32} />
+            <Mic size={18} />
+            <span>{isListening ? '듣는 중... 말씀해 주세요 🎙️' : '마이크 터치하여 말하기'}</span>
             {isListening && <div className="pulse-ripple" />}
           </button>
-          <span className="mic-status-label">
-            {isListening ? '듣고 있어요... 말씀해 보세요 🎙️' : '마이크를 눌러 영어로 말해보세요'}
-          </span>
         </div>
       )}
 
@@ -266,23 +260,23 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
           <span className="editor-label">영어 문장</span>
           {inputText && (
             <button type="button" className="tts-listen-btn" onClick={handleSpeak}>
-              <Volume2 size={16} />
-              <span>원어민 듣기</span>
+              <Volume2 size={15} />
+              <span>원어민 발음</span>
             </button>
           )}
         </div>
 
         <textarea
           className="sentence-textarea"
-          placeholder="여기에 영어 문장이 입력되거나 직접 쓰실 수 있습니다..."
+          placeholder="영어 문장을 직접 입력하거나 사진/음성을 선택하세요"
           value={inputText}
-          rows={3}
+          rows={2}
           onChange={(e) => setInputText(e.target.value)}
         />
 
         {translationText && (
           <div className="translation-preview">
-            <span className="trans-tag">한국어 번역</span>
+            <span className="trans-tag">번역</span>
             <p className="trans-text">{translationText}</p>
           </div>
         )}
@@ -294,8 +288,8 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
               className="analyze-btn saved"
               onClick={handleResetForNext}
             >
-              <Plus size={18} />
-              <span>새로운 문장 또 입력하기</span>
+              <Plus size={16} />
+              <span>새 문장 추가하기</span>
             </button>
           ) : (
             <button 
@@ -304,8 +298,8 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
               disabled={!inputText.trim() || isAnalyzing}
               onClick={handleSaveAndAnalyze}
             >
-              <Sparkles size={18} />
-              <span>{isAnalyzing ? 'AI가 분석하고 있어요...' : '문장 등록 & AI 분석하기'}</span>
+              <Sparkles size={16} />
+              <span>{isAnalyzing ? 'AI 분석 중...' : '문장 등록 & AI 분석'}</span>
             </button>
           )}
         </div>
@@ -314,19 +308,16 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
       {/* AI 추출 결과 및 각 보관함으로 원클릭 전송 섹션 */}
       {analysisResult && (
         <div className="discovery-results-section animate-slide-up">
-          <div className="discovery-banner">
-            <div className="banner-icon">✨</div>
-            <div>
-              <h4>문장학습에 저장 완료!</h4>
-              <p>문장에서 찾은 표현들을 원하는 보관함으로 쏙쏙 넣어보세요.</p>
-            </div>
+          <div className="discovery-compact-status">
+            <Check size={14} />
+            <span>문장학습에 저장 완료</span>
           </div>
 
           {/* 1. 추천 단어들 */}
           {analysisResult.suggestedWords && analysisResult.suggestedWords.length > 0 && (
             <div className="discovery-group">
               <div className="group-title">
-                <BookOpen size={16} />
+                <BookOpen size={15} />
                 <span>추천 단어</span>
               </div>
               <div className="items-grid">
@@ -347,11 +338,11 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
                     >
                       {addedItems.words[idx] ? (
                         <>
-                          <Check size={14} /> <span>단어장에 담김</span>
+                          <Check size={13} /> <span>담김</span>
                         </>
                       ) : (
                         <>
-                          <Plus size={14} /> <span>단어장으로</span>
+                          <Plus size={13} /> <span>단어장으로</span>
                         </>
                       )}
                     </button>
@@ -365,8 +356,8 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
           {analysisResult.suggestedGrammar && (
             <div className="discovery-group">
               <div className="group-title">
-                <Layers size={16} />
-                <span>추천 문법 패턴</span>
+                <Layers size={15} />
+                <span>추천 문법</span>
               </div>
               <div className="discovery-item-card full-width">
                 <div className="item-main">
@@ -382,11 +373,11 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
                 >
                   {addedItems.grammar ? (
                     <>
-                      <Check size={14} /> <span>문법장에 담김</span>
+                      <Check size={13} /> <span>담김</span>
                     </>
                   ) : (
                     <>
-                      <Plus size={14} /> <span>문법장으로</span>
+                      <Plus size={13} /> <span>문법장으로</span>
                     </>
                   )}
                 </button>
@@ -398,8 +389,8 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
           {analysisResult.suggestedIdioms && analysisResult.suggestedIdioms.length > 0 && (
             <div className="discovery-group">
               <div className="group-title">
-                <Bookmark size={16} />
-                <span>추천 숙어 & 관용 표현</span>
+                <Bookmark size={15} />
+                <span>추천 숙어</span>
               </div>
               <div className="items-grid">
                 {analysisResult.suggestedIdioms.map((idiomItem, idx) => (
@@ -416,11 +407,11 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
                     >
                       {addedItems.idioms[idx] ? (
                         <>
-                          <Check size={14} /> <span>숙어장에 담김</span>
+                          <Check size={13} /> <span>담김</span>
                         </>
                       ) : (
                         <>
-                          <Plus size={14} /> <span>숙어장으로</span>
+                          <Plus size={13} /> <span>숙어장으로</span>
                         </>
                       )}
                     </button>
@@ -430,15 +421,15 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
             </div>
           )}
 
-          {/* 문장장 바로가기 버튼 */}
+          {/* 문장학습 바로가기 버튼 */}
           <div className="go-sentences-nav">
             <button 
               type="button" 
               className="nav-to-sentences-btn"
               onClick={() => onNavigateTo && onNavigateTo('sentences')}
             >
-              <span>저장된 문장 목록 보러가기</span>
-              <ArrowRight size={18} />
+              <span>문장학습 목록 보기</span>
+              <ArrowRight size={16} />
             </button>
           </div>
         </div>
