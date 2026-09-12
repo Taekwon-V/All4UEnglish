@@ -1,0 +1,250 @@
+.retention-test-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding-bottom: 30px;
+}
+
+.test-category-tabs {
+  display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 16px;
+  gap: 4px;
+}
+
+.test-tab {
+  flex: 1;
+  padding: 9px 4px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.test-tab.active {
+  background: #ffffff;
+  color: #059669;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.test-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.test-progress-bar {
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #059669;
+  transition: width 0.3s ease;
+}
+
+.test-q-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.q-badge {
+  color: #059669;
+  background: #ecfdf5;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.score-badge {
+  color: #64748b;
+}
+
+.question-prompt-box {
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.q-guide {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.q-text {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.4;
+}
+
+.options-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.option-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.opt-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.option-btn:hover:not(.correct):not(.wrong) {
+  border-color: #059669;
+  background: #f0fdf4;
+}
+
+.option-btn.correct {
+  border-color: #10b981;
+  background: #ecfdf5;
+  color: #065f46;
+}
+.option-btn.correct .opt-num {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.option-btn.wrong {
+  border-color: #f87171;
+  background: #fef2f2;
+  color: #991b1b;
+}
+.option-btn.wrong .opt-num {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.answer-feedback-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.feedback-result {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.correct-label {
+  color: #059669;
+}
+
+.wrong-label {
+  color: #dc2626;
+}
+
+.next-q-btn {
+  padding: 13px;
+  border-radius: 14px;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 완료 카드 */
+.test-result-card {
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 32px 20px;
+  text-align: center;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.award-icon-box {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #ecfdf5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.test-result-card h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.score-summary {
+  margin: 0;
+  font-size: 15px;
+  color: #475569;
+}
+
+.encouragement-text {
+  font-size: 13.5px;
+  color: #059669;
+  font-weight: 600;
+}
+
+.retry-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  background: var(--primary, #059669);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}

@@ -1,0 +1,117 @@
+.archive-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 20px;
+  gap: 16px;
+}
+
+.archive-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.archive-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.archive-main-title {
+  font-family: var(--font-en-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-headline);
+}
+
+/* 검색바 */
+.archive-search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-surface);
+  border: 1px solid rgba(45, 106, 79, 0.15);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+.archive-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  width: 100%;
+  color: var(--text-headline);
+}
+
+/* 필터 탭 */
+.archive-filter-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.archive-filter-btn {
+  padding: 6px 14px;
+  border-radius: var(--radius-badge);
+  border: 1px solid rgba(45, 106, 79, 0.15);
+  background: var(--bg-surface);
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.archive-filter-btn.active {
+  background: var(--primary-brand);
+  color: #FFFFFF;
+  border-color: var(--primary-brand);
+}
+
+/* 단어 리스트 */
+.archive-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.archive-word-card {
+  background: var(--bg-surface);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgba(45, 106, 79, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.archive-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.archive-word-text {
+  font-family: var(--font-en-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-headline);
+}
+
+.archive-status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-badge);
+}
+.archive-status-badge.mastered {
+  background: var(--status-success-bg);
+  color: var(--status-success);
+}
+.archive-status-badge.review {
+  background: var(--status-review-bg);
+  color: #B45309;
+}

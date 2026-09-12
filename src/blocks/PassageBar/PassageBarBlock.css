@@ -1,0 +1,79 @@
+.passage-bar-container {
+  background: var(--bg-surface);
+  border-bottom: 1px solid rgba(45, 106, 79, 0.1);
+  padding: 14px 18px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.passage-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.passage-badge-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary-brand);
+}
+
+.passage-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 속도 토글 버튼 */
+.btn-speed-toggle {
+  background: var(--bg-canvas);
+  border: 1px solid rgba(45, 106, 79, 0.2);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-brand);
+  cursor: pointer;
+}
+
+/* 오디오 재생 버튼 */
+.btn-passage-play {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary-brand);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(45, 106, 79, 0.2);
+}
+.btn-passage-play.is-playing {
+  background: var(--accent-warm);
+}
+
+/* 원문 텍스트 영역 */
+.passage-text-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--bg-canvas);
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-headline);
+  font-family: var(--font-en-body);
+}
+
+.passage-text-collapsed {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
