@@ -67,18 +67,24 @@ html, body {
   font-family: var(--font-ko);
   font-size: 16px;
   line-height: 1.5;
-  overflow-x: hidden;
+  overflow: hidden;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  /* 모바일 스크롤 하단 내림 새로고침(Pull-to-refresh) 원천 차단 */
+  overscroll-behavior-y: none !important;
+  overscroll-behavior: none !important;
 }
 
 /* Mobile Simulator / Screen Frame Container */
 #root {
-  min-height: 100vh;
+  height: 100%;
+  height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: stretch;
   background-color: #E8E5DF; /* 데스크톱에서 모바일 폰 밖 배경 */
+  overflow: hidden;
+  overscroll-behavior-y: none !important;
 }
 
 /* Smartphone Viewport Shell (Galaxy S26 19.5:9) */
@@ -93,6 +99,8 @@ html, body {
   flex-direction: column;
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.1);
   overflow: hidden; /* 탑 헤더와 바텀 네비가 절대 밀려나지 않도록 고정 */
+  overscroll-behavior-y: none !important;
+  overscroll-behavior: none !important;
 }
 
 /* Global Top Header */

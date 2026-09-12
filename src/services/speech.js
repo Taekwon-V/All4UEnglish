@@ -6,11 +6,55 @@
 // 음성 합성 설정 키
 const VOICE_SETTINGS_KEY = 'all4u_voice_settings';
 
+// 보이스 캐시 및 초기화
+let cachedVoices = [];
+const initVoices = () => {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    cachedVoices = window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => {
+      cachedVoices = window.speechSynthesis.getVoices();
+    };
+  }
+};
+initVoices();
+
 export const CURATED_VOICES = [
-  { id: 'jenny', name: '제니 (Jenny)', gender: 'female', label: '👩 제니 (밝고 또렷한 여성)' },
-  { id: 'samantha', name: '사만다 (Samantha)', gender: 'female', label: '👩 사만다 (차분하고 부드러운 여성)' },
-  { id: 'guy', name: '가이 (Guy)', gender: 'male', label: '👨 가이 (자연스럽고 세련된 남성)' },
-  { id: 'alex', name: '알렉스 (Alex)', gender: 'male', label: '👨 알렉스 (깊고 신뢰감 있는 남성)' }
+  { 
+    id: 'jenny', 
+    name: '제니 (Jenny)', 
+    gender: 'female', 
+    label: '👩 제니 (밝고 또렷한 여성)',
+    pitch: 1.18,
+    rateFactor: 1.02,
+    keywords: ['jenny', 'zira', 'female', 'karen', 'victoria', 'woman', 'samantha', 'google us english']
+  },
+  { 
+    id: 'samantha', 
+    name: '사만다 (Samantha)', 
+    gender: 'female', 
+    label: '👩 사만다 (차분하고 부드러운 여성)',
+    pitch: 0.94,
+    rateFactor: 0.94,
+    keywords: ['samantha', 'victoria', 'karen', 'female', 'zira', 'woman']
+  },
+  { 
+    id: 'guy', 
+    name: '가이 (Guy)', 
+    gender: 'male', 
+    label: '👨 가이 (자연스럽고 세련된 남성)',
+    pitch: 0.76,
+    rateFactor: 1.0,
+    keywords: ['guy', 'david', 'male', 'mark', 'richard', 'george', 'man']
+  },
+  { 
+    id: 'alex', 
+    name: '알렉스 (Alex)', 
+    gender: 'male', 
+    label: '👨 알렉스 (깊고 신뢰감 있는 남성)',
+    pitch: 0.62,
+    rateFactor: 0.92,
+    keywords: ['alex', 'george', 'david', 'male', 'daniel', 'oliver', 'man']
+  }
 ];
 
 // 음성 합성 (TTS - Text to Speech)
@@ -35,13 +79,13 @@ export const SpeechService = {
   },
 
   // 영어 또는 한국어 문장 낭독
-  speak: (text, { lang = 'en-US', rate, pitch = 1.0, onEnd = () => {} } = {}) => {
+  speak: (text, { lang = 'en-US', rate, pitch, onEnd = () => {} } = {}) => {
     if (!('speechSynthesis' in window)) {
       console.warn('이 브라우저는 음성 합성을 지원하지 않습니다.');
       return;
     }
 
-    // 기존 재생 중인 음성 취소
+    // 기존 재생 중인 음성 즉시 취소
     window.speechSynthesis.cancel();
 
     const userSettings = SpeechService.getSettings();
@@ -49,32 +93,41 @@ export const SpeechService = {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
-    utterance.rate = finalRate;
-    utterance.pitch = pitch;
 
     if (lang.startsWith('en')) {
-      const voices = window.speechSynthesis.getVoices();
+      const allVoices = (cachedVoices && cachedVoices.length > 0) ? cachedVoices : window.speechSynthesis.getVoices();
+      const enVoices = allVoices.filter(v => v.lang.startsWith('en'));
       const targetId = userSettings.voiceId || 'jenny';
+      const profile = CURATED_VOICES.find(p => p.id === targetId) || CURATED_VOICES[0];
       
+      // 1. 키워드 기반 시스템 보이스 매칭
       let matchedVoice = null;
-      if (targetId === 'jenny') {
-        matchedVoice = voices.find(v => v.name.includes('Jenny') || (v.lang.startsWith('en') && v.name.includes('Female')) || v.name.includes('Samantha') || v.name.includes('Google US English'));
-      } else if (targetId === 'samantha') {
-        matchedVoice = voices.find(v => v.name.includes('Samantha') || v.name.includes('Victoria') || v.name.includes('Zira') || (v.lang.startsWith('en') && !v.name.includes('Male')));
-      } else if (targetId === 'guy') {
-        matchedVoice = voices.find(v => v.name.includes('Guy') || (v.lang.startsWith('en') && v.name.includes('Male')) || v.name.includes('David'));
-      } else if (targetId === 'alex') {
-        matchedVoice = voices.find(v => v.name.includes('Alex') || v.name.includes('George') || (v.lang.startsWith('en') && (v.name.includes('Male') || v.name.includes('David'))));
+      for (const kw of profile.keywords) {
+        matchedVoice = enVoices.find(v => v.name.toLowerCase().includes(kw));
+        if (matchedVoice) break;
       }
 
-      // fallback
-      if (!matchedVoice) {
-        matchedVoice = voices.find(v => v.lang.startsWith('en-US') || v.lang.startsWith('en'));
+      // 남성 보이스 요청 시 여성 키워드가 포함된 음성 배제 및 남성 보이스 탐색
+      if (profile.gender === 'male' && (!matchedVoice || matchedVoice.name.toLowerCase().includes('female'))) {
+        const maleVoice = enVoices.find(v => {
+          const n = v.name.toLowerCase();
+          return (n.includes('male') && !n.includes('female')) || n.includes('david') || n.includes('george') || n.includes('alex') || n.includes('guy');
+        });
+        if (maleVoice) matchedVoice = maleVoice;
       }
 
       if (matchedVoice) {
         utterance.voice = matchedVoice;
+      } else if (enVoices.length > 0) {
+        utterance.voice = enVoices[0];
       }
+
+      // 2. 어쿠스틱 피치 & 속도 변조 (단일 음성 기기에서도 남성/여성/개성 차이를 100% 실감나게 변환)
+      utterance.pitch = pitch !== undefined ? pitch : profile.pitch;
+      utterance.rate = finalRate * profile.rateFactor;
+    } else {
+      utterance.rate = finalRate;
+      utterance.pitch = pitch !== undefined ? pitch : 1.0;
     }
 
     utterance.onend = onEnd;

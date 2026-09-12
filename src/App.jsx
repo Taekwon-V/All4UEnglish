@@ -35,7 +35,9 @@ import {
   Shield,
   FolderLock,
   Settings,
-  Volume2
+  Volume2,
+  Maximize,
+  Minimize
 } from 'lucide-react';
 import { SpeechService, CURATED_VOICES } from './services/speech';
 
@@ -46,11 +48,41 @@ export default function App() {
     return new URLSearchParams(window.location.search).has('block');
   });
 
-  // 메인 5단 탭: 'input' | 'sentences' | 'library' | 'radio' | 'test'
-  const [activeTab, setActiveTab] = useState('input');
+  // 메인 5단 탭: 'input' | 'sentences' | 'library' | 'radio' | 'test' (새로고침 시에도 탭 유지)
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      return localStorage.getItem('all4u_active_tab') || 'input';
+    } catch {
+      return 'input';
+    }
+  });
+
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    try {
+      localStorage.setItem('all4u_active_tab', tab);
+    } catch {}
+  };
   
   // 플레이리스트 -> 라디오 연동 상태
   const [targetRadioPlaylist, setTargetRadioPlaylist] = useState(null);
+
+  // 전체 화면 토글 상태
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen()
+        .then(() => setIsFullscreen(true))
+        .catch(() => {});
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen()
+          .then(() => setIsFullscreen(false))
+          .catch(() => {});
+      }
+    }
+  };
 
   // 관리자 전용: 화이트리스트 계정 관리 모달 상태
   const [isWhitelistModalOpen, setIsWhitelistModalOpen] = useState(false);
@@ -65,6 +97,8 @@ export default function App() {
   const handleUpdateVoice = (voiceId) => {
     const updated = SpeechService.setSettings({ voiceId });
     setVoiceSettings(updated);
+    // 선택하자마자 해당 보이스로 즉시 시연 멘트 발화
+    handleTestVoice(voiceId);
   };
 
   const handleUpdateRate = (rate) => {
@@ -72,8 +106,18 @@ export default function App() {
     setVoiceSettings(updated);
   };
 
-  const handleTestVoice = () => {
-    SpeechService.speak("Hello! This is your personal English AI tutor.", {
+  const handleTestVoice = (specificVoiceId) => {
+    const targetId = specificVoiceId || voiceSettings.voiceId;
+    const profile = CURATED_VOICES.find(p => p.id === targetId);
+    let sampleText = "Hello! I am Jenny. Let's make English fun and easy!";
+    if (targetId === 'samantha') {
+      sampleText = "Hello. I am Samantha. Let's practice English together comfortably.";
+    } else if (targetId === 'guy') {
+      sampleText = "Hey there! I am Guy. Let's master practical, everyday English expressions!";
+    } else if (targetId === 'alex') {
+      sampleText = "Good day. I am Alex. Together, we will build confident and natural English.";
+    }
+    SpeechService.speak(sampleText, {
       rate: voiceSettings.rate
     });
   };
@@ -222,7 +266,7 @@ export default function App() {
   // 플레이리스트에서 [라디오로 듣기] 클릭 시 라디오 탭으로 전환
   const handlePlayPlaylistInRadio = (playlist) => {
     setTargetRadioPlaylist(playlist);
-    setActiveTab('radio');
+    handleSelectTab('radio');
   };
 
   return (
@@ -236,6 +280,26 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* 브라우저 기본 바 숨기기 / 전체화면 토글 버튼 */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "전체화면 종료" : "브라우저 바 숨기기 (전체화면)"}
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              color: '#334155',
+              cursor: 'pointer',
+              padding: '6px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            {isFullscreen ? <Minimize size={17} /> : <Maximize size={17} />}
+          </button>
+
           {/* 관리자 전용 계정 등록 관리 버튼 */}
           {currentUser.isAdmin && (
             <button
@@ -304,14 +368,15 @@ export default function App() {
         display: 'flex', 
         flexDirection: 'column', 
         overflowY: 'auto', 
-        padding: '16px 16px 8px',
-        paddingBottom: 'calc(var(--safe-bottom, 14px) + 72px)'
+        padding: '0 16px 8px',
+        paddingBottom: 'calc(var(--safe-bottom, 14px) + 72px)',
+        overscrollBehaviorY: 'contain'
       }}>
         
         {/* 1. 문장 입력 & AI 발굴 */}
         {activeTab === 'input' && (
           <UniversalInput 
-            onNavigateTo={(tab) => setActiveTab(tab)}
+            onNavigateTo={(tab) => handleSelectTab(tab)}
           />
         )}
 
@@ -326,7 +391,7 @@ export default function App() {
         {activeTab === 'library' && (
           <StudyLibrary 
             initialTab="words"
-            onNavigateToSentence={() => setActiveTab('sentences')}
+            onNavigateToSentence={() => handleSelectTab('sentences')}
           />
         )}
 
@@ -349,7 +414,7 @@ export default function App() {
       <nav className="global-bottom-nav">
         <button
           type="button"
-          onClick={() => setActiveTab('input')}
+          onClick={() => handleSelectTab('input')}
           style={{
             background: 'none',
             border: 'none',
@@ -367,7 +432,7 @@ export default function App() {
 
         <button
           type="button"
-          onClick={() => setActiveTab('sentences')}
+          onClick={() => handleSelectTab('sentences')}
           style={{
             background: 'none',
             border: 'none',
@@ -385,7 +450,7 @@ export default function App() {
 
         <button
           type="button"
-          onClick={() => setActiveTab('library')}
+          onClick={() => handleSelectTab('library')}
           style={{
             background: 'none',
             border: 'none',
@@ -403,7 +468,7 @@ export default function App() {
 
         <button
           type="button"
-          onClick={() => setActiveTab('radio')}
+          onClick={() => handleSelectTab('radio')}
           style={{
             background: 'none',
             border: 'none',
@@ -421,7 +486,7 @@ export default function App() {
 
         <button
           type="button"
-          onClick={() => setActiveTab('test')}
+          onClick={() => handleSelectTab('test')}
           style={{
             background: 'none',
             border: 'none',
@@ -697,11 +762,52 @@ export default function App() {
               </div>
             </div>
 
-            {/* 3. 미리듣기 & 완료 버튼 */}
+            {/* 3. 전체 화면 전환 (브라우저 바 숨기기) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#475569' }}>화면 표시 모드</span>
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                style={{
+                  width: '100%',
+                  padding: '11px',
+                  borderRadius: '12px',
+                  background: isFullscreen ? '#f1f5f9' : '#ecfdf5',
+                  border: isFullscreen ? '1px solid #cbd5e1' : '1px solid #a7f3d0',
+                  color: isFullscreen ? '#475569' : '#059669',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                <span>{isFullscreen ? '전체화면 종료 (브라우저 복귀)' : '브라우저 바 숨기고 전체화면으로 보기'}</span>
+              </button>
+
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '10px 12px',
+                fontSize: '11.5px',
+                color: '#64748b',
+                lineHeight: 1.5,
+                textAlign: 'left'
+              }}>
+                📱 <strong>주소창 없는 100% 순수 전체화면 앱으로 쓰는 법:</strong><br />
+                스마트폰 브라우저 메뉴(<strong>⋮</strong> 또는 <strong>≡</strong>)에서 <strong>[홈 화면에 추가]</strong> 또는 <strong>[앱 설치]</strong>를 누르시면 바탕화면에 아이콘이 생성되어 브라우저 주소창과 하단바가 완전히 사라진 진짜 앱처럼 실행됩니다.
+              </div>
+            </div>
+
+            {/* 4. 미리듣기 & 완료 버튼 */}
             <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
               <button
                 type="button"
-                onClick={handleTestVoice}
+                onClick={() => handleTestVoice(voiceSettings.voiceId)}
                 style={{
                   flex: 1,
                   display: 'flex',
