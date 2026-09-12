@@ -35,16 +35,29 @@ export function RadioPlayerComponent({
     }
   }, [targetPlaylist]);
 
-  // 현재 활성화된 재생 목록 (선택된 플레이리스트의 문장들 또는 전체 문장)
+  // 현재 활성화된 재생 목록 (학습 중인 문장 / 학습 완료 / 특정 플레이리스트 / 전체 문장)
   const currentTracks = React.useMemo(() => {
+    if (selectedPlaylistId === 'learning') {
+      const filtered = sentences.filter(s => s.status !== 'mastered');
+      return filtered.length > 0 ? filtered : sentences;
+    }
+    if (selectedPlaylistId === 'mastered') {
+      const filtered = sentences.filter(s => s.status === 'mastered');
+      return filtered.length > 0 ? filtered : sentences;
+    }
     if (selectedPlaylistId === 'all') {
       return sentences;
+    }
+    // 전달받은 가상 플레이리스트 (예: 학습 중 모음)
+    if (targetPlaylist && targetPlaylist.sentenceIds && selectedPlaylistId === targetPlaylist.id) {
+      const filtered = sentences.filter(s => targetPlaylist.sentenceIds.includes(s.id));
+      return filtered.length > 0 ? filtered : sentences;
     }
     const foundPl = playlists.find(p => p.id === selectedPlaylistId);
     if (!foundPl || !foundPl.sentenceIds) return sentences;
     const filtered = sentences.filter(s => foundPl.sentenceIds.includes(s.id));
     return filtered.length > 0 ? filtered : sentences;
-  }, [selectedPlaylistId, sentences, playlists]);
+  }, [selectedPlaylistId, sentences, playlists, targetPlaylist]);
 
   const currentTrack = currentTracks[currentIdx] || currentTracks[0];
 
@@ -185,6 +198,8 @@ export function RadioPlayerComponent({
             setSelectedPlaylistId(e.target.value);
           }}
         >
+          <option value="learning">📖 학습 중인 문장 ({sentences.filter(s => s.status !== 'mastered').length}개)</option>
+          <option value="mastered">✅ 학습 완료된 문장 ({sentences.filter(s => s.status === 'mastered').length}개)</option>
           <option value="all">📂 전체 문장 ({sentences.length}개)</option>
           {playlists.map(pl => (
             <option key={pl.id} value={pl.id}>

@@ -172,15 +172,16 @@ export const StorageService = {
     }
   },
 
-  // ================= 1. 문장장 (Sentences) =================
+  // ================= 1. 문장학습 (Sentences) =================
   getSentences: () => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.SENTENCES);
-      if (!data) {
-        localStorage.setItem(STORAGE_KEYS.SENTENCES, JSON.stringify(INITIAL_SENTENCES));
-        return INITIAL_SENTENCES;
-      }
-      return JSON.parse(data);
+      const list = data ? JSON.parse(data) : INITIAL_SENTENCES;
+      // status 기본값 보장 (마이그레이션)
+      return list.map(s => ({
+        ...s,
+        status: s.status || 'learning' // 'learning' (학습 중) | 'mastered' (학습 완료)
+      }));
     } catch {
       return INITIAL_SENTENCES;
     }
@@ -195,14 +196,20 @@ export const StorageService = {
       let targetItem;
       if (existingIdx >= 0) {
         updated = [...sentences];
-        targetItem = { ...sentences[existingIdx], ...sentenceData };
+        targetItem = { 
+          ...sentences[existingIdx], 
+          ...sentenceData,
+          status: sentenceData.status || sentences[existingIdx].status || 'learning'
+        };
         updated[existingIdx] = targetItem;
       } else {
         targetItem = {
           ...sentenceData,
           id: sentenceData.id || 's-' + Date.now(),
+          status: sentenceData.status || 'learning',
           tags: sentenceData.tags || [],
           isBookmarked: sentenceData.isBookmarked || false,
+          reviewCount: 1,
           createdAt: sentenceData.createdAt || new Date().toISOString()
         };
         updated = [targetItem, ...sentences];
@@ -214,6 +221,25 @@ export const StorageService = {
       console.error('문장 저장 실패:', e);
       return [];
     }
+  },
+
+  setSentenceStatus: (sentenceId, status) => {
+    let changed = null;
+    const sentences = StorageService.getSentences().map(s => {
+      if (s.id === sentenceId) {
+        changed = { 
+          ...s, 
+          status,
+          reviewedAt: new Date().toISOString(),
+          reviewCount: (s.reviewCount || 0) + (status === 'mastered' ? 1 : 0)
+        };
+        return changed;
+      }
+      return s;
+    });
+    localStorage.setItem(STORAGE_KEYS.SENTENCES, JSON.stringify(sentences));
+    if (changed) syncToFirestore('sentences', changed.id, changed);
+    return sentences;
   },
 
   deleteSentence: (sentenceId) => {
