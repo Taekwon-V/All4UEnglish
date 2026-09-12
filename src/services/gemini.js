@@ -35,7 +35,7 @@ export const GeminiService = {
 }
 `;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,7 +113,7 @@ export const GeminiService = {
 `;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -145,47 +145,57 @@ export const GeminiService = {
    */
   generateVariations: async (type, item, originalSentence = '') => {
     const targetName = item.pattern || item.idiom || item.word;
+    const detailHint = item.nuanceKo || item.explanation || item.meaning || '';
+    const posHint = item.partOfSpeech ? `(품사: ${item.partOfSpeech})` : '';
 
     if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_KEY')) {
       return GeminiService.fallbackVariations(type, targetName);
     }
 
     const prompt = `
-당신은 아내의 일상(카페, 여행, 쇼핑, 집안일, 직장 대화, 취미 등)에 맞춘 생생한 예문을 만들어주는 영어 튜터입니다.
-아래 [대상 ${type}]을 사용하여, 아내가 실제로 입 밖으로 내뱉고 싶은 세련되고 자연스러운 새로운 실생활 예문 2~3개를 생성하세요.
+당신은 일상 영어 회화 튜터입니다.
+주어진 학습 대상 [${type === 'word' ? '단어' : type === 'grammar' ? '문법 패턴' : '숙어/표현'}]을 직접 활용하여, 실제 원어민이 일상에서 사용하는 자연스럽고 세련된 실생활 영어 예문 3개와 자연스러운 한국어 번역을 만드세요.
 
-[대상 ${type}]: "${targetName}"
-[참고 원문]: "${originalSentence}"
+[학습 대상]: ${targetName} ${posHint}
+[의미/뉘앙스]: ${detailHint}
+[참고 원문]: ${originalSentence || '없음'}
+
+[핵심 규칙 - 절대 준수]:
+1. 대상 단어/표현을 따옴표(" ")로 감싸서 언급하거나, 단어 자체에 대해 이야기하는 메타 문장(예: I practiced "${targetName}", Using "${targetName}" is good 등)은 절대로 작성하지 마십시오.
+2. 반드시 해당 단어/표현이 문장의 주어/동사/목적어/보어/수식어 등으로 실제 사용된 생활 대화/독백 문장이어야 합니다.
+   (좋은 예: She was reluctant to leave the party. / He was reluctant to admit his mistake.)
+3. 카페, 식당, 쇼핑, 직장, 가족, 여행, 감정 표현 등 일상 생활에서 입 밖으로 내뱉기 좋은 생생하고 현대적인 표현이어야 합니다.
+4. 한국어 번역도 대상 단어를 따옴표로 감싸서 설명조로 쓰지 말고, 자연스러운 구어체로 번역하십시오.
 
 [응답 JSON 규격]:
 {
   "variations": [
     {
-      "en": "새로운 실생활 영어 예문 1",
+      "en": "자연스럽게 활용된 영어 예문 1",
       "ko": "자연스러운 한국어 번역 1"
     },
     {
-      "en": "새로운 실생활 영어 예문 2",
+      "en": "자연스럽게 활용된 영어 예문 2",
       "ko": "자연스러운 한국어 번역 2"
     },
     {
-      "en": "새로운 실생활 영어 예문 3",
+      "en": "자연스럽게 활용된 영어 예문 3",
       "ko": "자연스러운 한국어 번역 3"
     }
   ]
 }
-반드시 마크다운 없이 순수 JSON만 반환하세요.
+마크다운 백틱 없이 순수 JSON만 반환하세요.
 `;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.7, // 신선한 예문을 위해 창의성 살짝 부여
+            temperature: 0.7, // 신선하고 생생한 예문
             responseMimeType: "application/json"
           }
         })
@@ -231,20 +241,45 @@ export const GeminiService = {
   },
 
   fallbackVariations: (type, targetName) => {
-    const timestamp = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    return [
-      {
-        en: `I always make sure to use "${targetName}" when talking to friends.`,
-        ko: `친구들과 이야기할 때 늘 "${targetName}" 표현을 사용하려고 해요. (${timestamp} 생성)`
-      },
-      {
-        en: `Could you tell me how you practiced "${targetName}" today?`,
-        ko: `오늘 "${targetName}" 표현을 어떻게 연습하셨는지 말씀해 주실 수 있나요?`
-      },
-      {
-        en: `It feels much more natural once you get used to "${targetName}".`,
-        ko: `"${targetName}" 표현에 익숙해지고 나면 훨씬 더 자연스럽게 느껴집니다.`
-      }
-    ];
+    const clean = (targetName || '').replace(/["']/g, '').trim();
+    if (type === 'word') {
+      return [
+        {
+          en: `She seemed somewhat ${clean} to leave the gathering so early.`,
+          ko: `그녀는 그렇게 일찍 자리를 뜨는 것을 다소 주저하는 듯했습니다.`
+        },
+        {
+          en: `You don't need to be ${clean} to ask questions whenever you feel lost.`,
+          ko: `이해하기 어려울 때마다 질문하는 것을 망설이거나 어려워할 필요 없습니다.`
+        },
+        {
+          en: `They were initially ${clean}, but decided to accept the proposal in the end.`,
+          ko: `처음에는 약간 꺼려했으나, 결국에는 제안을 받아들이기로 했습니다.`
+        }
+      ];
+    } else if (type === 'grammar') {
+      return [
+        {
+          en: `I was reluctant to bring it up during the meeting, but it was necessary.`,
+          ko: `회의 중에 그 이야기를 꺼내기가 망설여졌지만, 꼭 필요한 말이었습니다.`
+        },
+        {
+          en: `Don't be hesitant to try new opportunities when they come along.`,
+          ko: `새로운 기회가 찾아왔을 때 시도해 보는 것을 주저하지 마세요.`
+        }
+      ];
+    } else {
+      return [
+        {
+          en: `We finally managed to figure out the best way to handle this situation.`,
+          ko: `우리는 마침내 이 상황을 해결할 가장 좋은 방법을 찾아냈습니다.`
+        },
+        {
+          en: `It took a few days to figure out all the little details of the schedule.`,
+          ko: `일정의 사소한 세부사항들을 모두 파악하는 데 며칠이 걸렸습니다.`
+        }
+      ];
+    }
   }
 };
+
