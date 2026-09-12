@@ -1,5 +1,16 @@
 {
   "firestore": {
     "rules": "firestore.rules"
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "All4UEnglish",
+        "supportEmail": "inchul17.kim@gmail.com",
+        "authorizedRedirectUris": [
+          "https://all4-u-english.vercel.app"
+        ]
+      }
+    }
   }
 }
