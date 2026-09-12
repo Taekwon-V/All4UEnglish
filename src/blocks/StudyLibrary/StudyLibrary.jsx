@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Layers, Bookmark, Sparkles, Volume2, Plus, 
   Check, Trash2, Search, Filter, Quote, ArrowUpRight, Loader2,
-  ChevronDown, ChevronUp, Calendar, ArrowUpDown
+  ChevronDown, ChevronUp, Calendar, ArrowUpDown, X, Zap
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { GeminiService } from '../../services/gemini';
@@ -26,6 +26,18 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
   const [generatingId, setGeneratingId] = useState(null);
   const [savedVariationKeys, setSavedVariationKeys] = useState({}); // { 'itemId-varIdx': true }
 
+  // ================= 직접 추가 모달 상태 =================
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addType, setAddType] = useState('word'); // 'word' | 'grammar' | 'idiom'
+  const [addTerm, setAddTerm] = useState('');
+  const [addTag, setAddTag] = useState('동사');
+  const [addMeaning1, setAddMeaning1] = useState('');
+  const [addMeaning2, setAddMeaning2] = useState('');
+  const [addMeaning3, setAddMeaning3] = useState('');
+  const [addNuance, setAddNuance] = useState('');
+  const [addSentence, setAddSentence] = useState('');
+  const [isAiFilling, setIsAiFilling] = useState(false);
+
   // 데이터 불러오기
   const refreshData = () => {
     setWords(StorageService.getWords());
@@ -41,11 +53,22 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
     setExpandedIds(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // 날짜 포맷 (세부용 YYYY.MM.DD)
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return '';
     return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  // 요청사항: 2번째 줄용 짧은 생성월 (YY.MM 형태)
+  const formatShortMonth = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const yy = String(d.getFullYear()).slice(2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${yy}.${mm}`;
   };
 
   // 삭제 처리
@@ -100,12 +123,106 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
     setSavedVariationKeys(prev => ({ ...prev, [key]: true }));
   };
 
+  // ================= 직접 추가 모달 열기 & AI 자동 채우기 =================
+  const handleOpenAddModal = () => {
+    const defaultType = activeTab === 'words' ? 'word' : activeTab === 'grammar' ? 'grammar' : 'idiom';
+    setAddType(defaultType);
+    setAddTerm('');
+    setAddTag(defaultType === 'word' ? '동사' : defaultType === 'grammar' ? 'to+V' : '동사구');
+    setAddMeaning1('');
+    setAddMeaning2('');
+    setAddMeaning3('');
+    setAddNuance('');
+    setAddSentence('');
+    setIsAddModalOpen(true);
+  };
+
+  const handleTypeChange = (type) => {
+    setAddType(type);
+    if (type === 'word') setAddTag('동사');
+    else if (type === 'grammar') setAddTag('to+V');
+    else if (type === 'idiom') setAddTag('동사구');
+  };
+
+  const handleAiAutoFill = async () => {
+    if (!addTerm.trim()) {
+      alert('먼저 영어 표현을 입력해 주세요.');
+      return;
+    }
+    setIsAiFilling(true);
+    try {
+      const result = await GeminiService.lookupExpression(addType, addTerm.trim());
+      if (result) {
+        if (addType === 'word') {
+          if (result.partOfSpeech) setAddTag(result.partOfSpeech);
+          if (result.dictionaryMeanings && result.dictionaryMeanings.length > 0) {
+            setAddMeaning1(result.dictionaryMeanings[0] || '');
+            setAddMeaning2(result.dictionaryMeanings[1] || '');
+            setAddMeaning3(result.dictionaryMeanings[2] || '');
+          }
+          if (result.nuanceKo) setAddNuance(result.nuanceKo);
+          if (result.sampleSentence) setAddSentence(result.sampleSentence);
+        } else if (addType === 'grammar') {
+          if (result.tag) setAddTag(result.tag);
+          if (result.explanation) setAddNuance(result.explanation);
+          if (result.sampleSentence) setAddSentence(result.sampleSentence);
+        } else if (addType === 'idiom') {
+          if (result.roleTag) setAddTag(result.roleTag);
+          if (result.meaning) setAddNuance(result.meaning);
+          if (result.sampleSentence) setAddSentence(result.sampleSentence);
+        }
+      }
+    } catch (err) {
+      console.error('AI 자동 채우기 오류:', err);
+    } finally {
+      setIsAiFilling(false);
+    }
+  };
+
+  const handleSaveDirectItem = (e) => {
+    e.preventDefault();
+    if (!addTerm.trim()) {
+      alert('영어 표현을 입력해 주세요.');
+      return;
+    }
+
+    if (addType === 'word') {
+      const dictMeanings = [addMeaning1, addMeaning2, addMeaning3].filter(m => m.trim().length > 0);
+      StorageService.saveWord({
+        word: addTerm.trim(),
+        partOfSpeech: addTag.trim() || '단어',
+        dictionaryMeanings: dictMeanings,
+        nuanceKo: addNuance.trim() || (dictMeanings.length > 0 ? dictMeanings.join(', ') : '직접 등록한 단어입니다.'),
+        originalSentence: addSentence.trim()
+      });
+      setActiveTab('words');
+    } else if (addType === 'grammar') {
+      StorageService.saveGrammar({
+        pattern: addTerm.trim(),
+        tag: addTag.trim() ? (addTag.startsWith('#') ? addTag : `#${addTag}`) : '#문법패턴',
+        explanation: addNuance.trim() || '직접 등록한 문법 패턴입니다.',
+        originalSentence: addSentence.trim()
+      });
+      setActiveTab('grammar');
+    } else if (addType === 'idiom') {
+      StorageService.saveIdiom({
+        idiom: addTerm.trim(),
+        roleTag: addTag.trim() || '숙어/표현',
+        meaning: addNuance.trim() || '직접 등록한 숙어 표현입니다.',
+        originalSentence: addSentence.trim()
+      });
+      setActiveTab('idioms');
+    }
+
+    refreshData();
+    setIsAddModalOpen(false);
+  };
+
   // 단어에 대한 사전적 대표 의미 / 품사 보완 헬퍼
   const getEnrichedWord = (w) => {
     let dictMeanings = w.dictionaryMeanings;
     let pos = w.partOfSpeech;
     
-    // achieve 기본 샘플 및 기존 데이터 보완
     if ((!dictMeanings || dictMeanings.length === 0) && w.word?.toLowerCase() === 'achieve') {
       dictMeanings = ["달성하다", "성취하다", "이루어 내다"];
       pos = pos || "동사";
@@ -172,7 +289,7 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
 
   return (
     <div className="study-library-container">
-      {/* 상단 고정 헤더: 탭 + 검색 + 정렬 */}
+      {/* 상단 고정 헤더: 탭 + 검색 + 정렬 + 직접 추가 버튼 */}
       <div className="library-sticky-header">
         {/* 3단 세그먼트 상단 탭 */}
         <div className="library-tabs">
@@ -204,10 +321,10 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
           </button>
         </div>
 
-        {/* 검색 및 정렬 바 */}
+        {/* 검색, 정렬 및 [+ 직접 추가] 컨트롤 바 */}
         <div className="library-controls-row">
           <div className="library-search-bar">
-            <Search size={16} className="search-icon" />
+            <Search size={15} className="search-icon" />
             <input 
               type="text" 
               placeholder="단어, 뜻, 패턴, 예문 검색..." 
@@ -217,51 +334,48 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
           </div>
 
           <div className="library-sort-wrapper">
-            <ArrowUpDown size={14} className="sort-icon" />
+            <ArrowUpDown size={13} className="sort-icon" />
             <select 
               value={sortBy} 
               onChange={(e) => setSortBy(e.target.value)}
               className="library-sort-select"
             >
-              <option value="latest">최신 등록순</option>
+              <option value="latest">최신순</option>
               <option value="oldest">오래된순</option>
-              <option value="alpha">알파벳순</option>
+              <option value="alpha">가나다순</option>
             </select>
           </div>
+
+          <button 
+            type="button" 
+            className="direct-add-btn" 
+            onClick={handleOpenAddModal}
+            title="서재에 직접 추가하기"
+          >
+            <Plus size={15} />
+            <span>추가</span>
+          </button>
         </div>
       </div>
 
-      {/* 1. 단어장 탭 내용 */}
+      {/* ================= 1. 단어장 탭 내용 ================= */}
       {activeTab === 'words' && (
         <div className="accordion-list-section">
           {processedWords.length === 0 ? (
-            <div className="library-empty-box">등록된 단어가 없습니다.</div>
+            <div className="library-empty-box">등록된 단어가 없습니다. [+ 추가] 버튼으로 등록해보세요!</div>
           ) : (
             processedWords.map((item) => {
               const isExpanded = !!expandedIds[item.id];
               const dateDisplay = formatDate(item.createdAt);
+              const shortMonth = formatShortMonth(item.createdAt);
 
               return (
                 <div key={item.id} className={`accordion-card word-theme ${isExpanded ? 'is-open' : ''}`}>
-                  {/* 접힌 기본 리스트 행 (누르면 확장) */}
-                  <div className="accordion-header-row" onClick={() => toggleExpand(item.id)}>
-                    <div className="header-left">
-                      <span className="part-badge">{item.partOfSpeech || '단어'}</span>
-                      <strong className="header-title">{item.word}</strong>
-                      <span className="header-preview">
-                        {item.dictionaryMeanings && item.dictionaryMeanings.length > 0 
-                          ? item.dictionaryMeanings.join(', ')
-                          : item.nuanceKo}
-                      </span>
-                    </div>
-
-                    <div className="header-right">
-                      {dateDisplay && (
-                        <span className="meta-date-chip">
-                          <Calendar size={11} />
-                          <span>{dateDisplay}</span>
-                        </span>
-                      )}
+                  {/* 접힌 2줄 기본 행 */}
+                  <div className="accordion-summary-row" onClick={() => toggleExpand(item.id)}>
+                    {/* 첫째 줄: 오로지 영어 표현과 소리버튼만 */}
+                    <div className="summary-line-1">
+                      <strong className="summary-term">{item.word}</strong>
                       <button 
                         type="button" 
                         className="tts-mini-icon-btn" 
@@ -270,30 +384,50 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                       >
                         <Volume2 size={16} />
                       </button>
-                      <button 
-                        type="button" 
-                        className="delete-mini-btn" 
-                        title="단어 삭제"
-                        onClick={(e) => handleDelete('word', item, e)}
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                      <span className="accordion-chevron">
-                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                      </span>
+                    </div>
+
+                    {/* 둘째 줄: 사전적 의미, 생성월(yymm), 쓰레기통 */}
+                    <div className="summary-line-2">
+                      <div className="summary-meaning-col">
+                        <span className="part-badge">{item.partOfSpeech || '단어'}</span>
+                        <span className="summary-meaning-text">
+                          {item.dictionaryMeanings && item.dictionaryMeanings.length > 0 
+                            ? item.dictionaryMeanings.join(', ')
+                            : item.nuanceKo}
+                        </span>
+                      </div>
+
+                      <div className="summary-actions-col">
+                        {shortMonth && (
+                          <span className="meta-yymm-chip" title={`등록일: ${dateDisplay}`}>
+                            {shortMonth}
+                          </span>
+                        )}
+                        <button 
+                          type="button" 
+                          className="delete-mini-btn" 
+                          title="단어 삭제"
+                          onClick={(e) => handleDelete('word', item, e)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        <span className="accordion-chevron">
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* 펼쳤을 때 나타나는 상세 설명 박스 */}
+                  {/* 펼쳤을 때 나타나는 세부 설명 박스 */}
                   {isExpanded && (
                     <div className="accordion-body-content">
-                      <div className="expanded-top-info">
-                        <div className="word-heading">
+                      {item.phonetic && (
+                        <div className="expanded-top-info">
                           <span className="phonetic">{item.phonetic}</span>
                         </div>
-                      </div>
+                      )}
 
-                      {/* 13번: 사전적 형태 추가 (대표 의미 3개 및 동사/명사/형용사 구분) */}
+                      {/* 사전적 대표 의미 */}
                       {item.dictionaryMeanings && item.dictionaryMeanings.length > 0 && (
                         <div className="dict-meanings-container">
                           <div className="dict-title-bar">
@@ -324,7 +458,7 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                         <div className="original-sentence-box">
                           <div className="box-tag">
                             <Quote size={12} />
-                            <span>처음 담았던 원문</span>
+                            <span>예문 / 원문</span>
                           </div>
                           <p className="en-text">{item.originalSentence}</p>
                           <button 
@@ -419,44 +553,59 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
         </div>
       )}
 
-      {/* 2. 문법장 탭 내용 */}
+      {/* ================= 2. 문법장 탭 내용 ================= */}
       {activeTab === 'grammar' && (
         <div className="accordion-list-section">
           {processedGrammar.length === 0 ? (
-            <div className="library-empty-box">등록된 문법 패턴이 없습니다.</div>
+            <div className="library-empty-box">등록된 문법 패턴이 없습니다. [+ 추가] 버튼으로 등록해보세요!</div>
           ) : (
             processedGrammar.map((item) => {
               const isExpanded = !!expandedIds[item.id];
               const dateDisplay = formatDate(item.createdAt);
+              const shortMonth = formatShortMonth(item.createdAt);
 
               return (
                 <div key={item.id} className={`accordion-card grammar-theme ${isExpanded ? 'is-open' : ''}`}>
-                  {/* 접힌 기본 행 */}
-                  <div className="accordion-header-row" onClick={() => toggleExpand(item.id)}>
-                    <div className="header-left">
-                      <span className="pattern-badge">{item.tag || '#문법패턴'}</span>
-                      <strong className="header-title">{item.pattern}</strong>
-                      <span className="header-preview">{item.explanation}</span>
-                    </div>
-
-                    <div className="header-right">
-                      {dateDisplay && (
-                        <span className="meta-date-chip">
-                          <Calendar size={11} />
-                          <span>{dateDisplay}</span>
-                        </span>
-                      )}
+                  {/* 접힌 2줄 기본 행 */}
+                  <div className="accordion-summary-row" onClick={() => toggleExpand(item.id)}>
+                    {/* 첫째 줄: 오로지 영어 표현과 소리버튼만 */}
+                    <div className="summary-line-1">
+                      <strong className="summary-term">{item.pattern}</strong>
                       <button 
                         type="button" 
-                        className="delete-mini-btn" 
-                        title="문법 삭제"
-                        onClick={(e) => handleDelete('grammar', item, e)}
+                        className="tts-mini-icon-btn" 
+                        title="발음 듣기"
+                        onClick={(e) => handleSpeak(item.pattern, e)}
                       >
-                        <Trash2 size={15} />
+                        <Volume2 size={16} />
                       </button>
-                      <span className="accordion-chevron">
-                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                      </span>
+                    </div>
+
+                    {/* 둘째 줄: 사전적 의미/설명, 생성월(yymm), 쓰레기통 */}
+                    <div className="summary-line-2">
+                      <div className="summary-meaning-col">
+                        <span className="pattern-badge">{item.tag || '#문법패턴'}</span>
+                        <span className="summary-meaning-text">{item.explanation}</span>
+                      </div>
+
+                      <div className="summary-actions-col">
+                        {shortMonth && (
+                          <span className="meta-yymm-chip" title={`등록일: ${dateDisplay}`}>
+                            {shortMonth}
+                          </span>
+                        )}
+                        <button 
+                          type="button" 
+                          className="delete-mini-btn" 
+                          title="문법 삭제"
+                          onClick={(e) => handleDelete('grammar', item, e)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        <span className="accordion-chevron">
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -470,7 +619,7 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                         <div className="original-sentence-box">
                           <div className="box-tag">
                             <Quote size={12} />
-                            <span>처음 담았던 원문</span>
+                            <span>예문 / 원문</span>
                           </div>
                           <p className="en-text">{item.originalSentence}</p>
                           <button 
@@ -565,33 +714,24 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
         </div>
       )}
 
-      {/* 3. 숙어장 탭 내용 */}
+      {/* ================= 3. 숙어장 탭 내용 ================= */}
       {activeTab === 'idioms' && (
         <div className="accordion-list-section">
           {processedIdioms.length === 0 ? (
-            <div className="library-empty-box">등록된 숙어가 없습니다.</div>
+            <div className="library-empty-box">등록된 숙어가 없습니다. [+ 추가] 버튼으로 등록해보세요!</div>
           ) : (
             processedIdioms.map((item) => {
               const isExpanded = !!expandedIds[item.id];
               const dateDisplay = formatDate(item.createdAt);
+              const shortMonth = formatShortMonth(item.createdAt);
 
               return (
                 <div key={item.id} className={`accordion-card idiom-theme ${isExpanded ? 'is-open' : ''}`}>
-                  {/* 접힌 기본 행 */}
-                  <div className="accordion-header-row" onClick={() => toggleExpand(item.id)}>
-                    <div className="header-left">
-                      <span className="idiom-badge">숙어/표현</span>
-                      <strong className="header-title">{item.idiom}</strong>
-                      <span className="header-preview">{item.meaning}</span>
-                    </div>
-
-                    <div className="header-right">
-                      {dateDisplay && (
-                        <span className="meta-date-chip">
-                          <Calendar size={11} />
-                          <span>{dateDisplay}</span>
-                        </span>
-                      )}
+                  {/* 접힌 2줄 기본 행 */}
+                  <div className="accordion-summary-row" onClick={() => toggleExpand(item.id)}>
+                    {/* 첫째 줄: 오로지 영어 표현과 소리버튼만 */}
+                    <div className="summary-line-1">
+                      <strong className="summary-term">{item.idiom}</strong>
                       <button 
                         type="button" 
                         className="tts-mini-icon-btn" 
@@ -600,17 +740,33 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                       >
                         <Volume2 size={16} />
                       </button>
-                      <button 
-                        type="button" 
-                        className="delete-mini-btn" 
-                        title="숙어 삭제"
-                        onClick={(e) => handleDelete('idiom', item, e)}
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                      <span className="accordion-chevron">
-                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                      </span>
+                    </div>
+
+                    {/* 둘째 줄: 사전적 의미/뜻, 생성월(yymm), 쓰레기통 */}
+                    <div className="summary-line-2">
+                      <div className="summary-meaning-col">
+                        <span className="idiom-badge">{item.roleTag || '숙어/표현'}</span>
+                        <span className="summary-meaning-text">{item.meaning}</span>
+                      </div>
+
+                      <div className="summary-actions-col">
+                        {shortMonth && (
+                          <span className="meta-yymm-chip" title={`등록일: ${dateDisplay}`}>
+                            {shortMonth}
+                          </span>
+                        )}
+                        <button 
+                          type="button" 
+                          className="delete-mini-btn" 
+                          title="숙어 삭제"
+                          onClick={(e) => handleDelete('idiom', item, e)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        <span className="accordion-chevron">
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -624,7 +780,7 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
                         <div className="original-sentence-box">
                           <div className="box-tag">
                             <Quote size={12} />
-                            <span>처음 담았던 원문</span>
+                            <span>예문 / 원문</span>
                           </div>
                           <p className="en-text">{item.originalSentence}</p>
                           <button 
@@ -716,6 +872,216 @@ export default function StudyLibrary({ initialTab = 'words', onNavigateToSentenc
               );
             })
           )}
+        </div>
+      )}
+
+      {/* ================= 직접 추가 모달 (바텀시트) ================= */}
+      {isAddModalOpen && (
+        <div className="modal-backdrop" onClick={() => setIsAddModalOpen(false)}>
+          <div className="direct-add-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-header">
+              <div className="sheet-title-row">
+                <span className="sheet-icon-tag">✏️</span>
+                <h3>서재에 직접 등록하기</h3>
+              </div>
+              <button 
+                type="button" 
+                className="close-sheet-btn"
+                onClick={() => setIsAddModalOpen(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* 3단 탭 전환기 */}
+            <div className="sheet-tab-selector">
+              <button 
+                type="button" 
+                className={`sheet-tab ${addType === 'word' ? 'active' : ''}`}
+                onClick={() => handleTypeChange('word')}
+              >
+                단어 등록
+              </button>
+              <button 
+                type="button" 
+                className={`sheet-tab ${addType === 'grammar' ? 'active' : ''}`}
+                onClick={() => handleTypeChange('grammar')}
+              >
+                문법 등록
+              </button>
+              <button 
+                type="button" 
+                className={`sheet-tab ${addType === 'idiom' ? 'active' : ''}`}
+                onClick={() => handleTypeChange('idiom')}
+              >
+                숙어 등록
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDirectItem} className="sheet-form">
+              {/* 표제어 입력 + AI 자동완성 버튼 */}
+              <div className="form-group">
+                <label className="form-label">
+                  {addType === 'word' ? '영어 단어' : addType === 'grammar' ? '문법 패턴' : '숙어 / 관용구'} *
+                </label>
+                <div className="input-with-ai-btn">
+                  <input 
+                    type="text" 
+                    placeholder={addType === 'word' ? '예: resilient' : addType === 'grammar' ? '예: be used to -ing' : '예: break the ice'}
+                    value={addTerm}
+                    onChange={(e) => setAddTerm(e.target.value)}
+                    className="sheet-text-input"
+                    required
+                    autoFocus
+                  />
+                  <button 
+                    type="button" 
+                    className="btn-ai-autofill"
+                    onClick={handleAiAutoFill}
+                    disabled={isAiFilling || !addTerm.trim()}
+                    title="단어/표현만 넣고 누르면 품사, 사전 뜻, 뉘앙스가 1초 만에 자동 채워집니다!"
+                  >
+                    {isAiFilling ? (
+                      <>
+                        <Loader2 size={13} className="spin-loader" />
+                        <span>채우는 중...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap size={13} />
+                        <span>AI 자동채우기</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* 품사 / 역할 뱃지 선택 (추천 칩 + 직접 입력) */}
+              <div className="form-group">
+                <label className="form-label">
+                  {addType === 'word' ? '품사 구분' : addType === 'grammar' ? '문법 구조 태그' : '구문 역할 태그'}
+                </label>
+                <div className="tag-chips-row">
+                  {addType === 'word' && ['동사', '명사', '형용사', '부사'].map(tag => (
+                    <button 
+                      key={tag}
+                      type="button" 
+                      className={`chip-select-btn ${addTag === tag ? 'selected' : ''}`}
+                      onClick={() => setAddTag(tag)}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                  {addType === 'grammar' && ['to+V', 'P.P.', 'V-ing', '조동사+V', '접속/가정', '수동태'].map(tag => (
+                    <button 
+                      key={tag}
+                      type="button" 
+                      className={`chip-select-btn ${addTag === tag ? 'selected' : ''}`}
+                      onClick={() => setAddTag(tag)}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                  {addType === 'idiom' && ['동사구', '형용사구', '부사구', '전치사구', '대화 관용구'].map(tag => (
+                    <button 
+                      key={tag}
+                      type="button" 
+                      className={`chip-select-btn ${addTag === tag ? 'selected' : ''}`}
+                      onClick={() => setAddTag(tag)}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="직접 태그 입력 (예: to+동사원형, 이어동사 등)" 
+                  value={addTag}
+                  onChange={(e) => setAddTag(e.target.value)}
+                  className="sheet-sub-input"
+                />
+              </div>
+
+              {/* 단어일 때: 대표 사전 의미 3개 */}
+              {addType === 'word' && (
+                <div className="form-group">
+                  <label className="form-label">사전적 대표 의미 (최대 3개)</label>
+                  <div className="meanings-inputs-col">
+                    <input 
+                      type="text" 
+                      placeholder="1. 대표 뜻 (예: 회복력 있는)" 
+                      value={addMeaning1}
+                      onChange={(e) => setAddMeaning1(e.target.value)}
+                      className="sheet-sub-input"
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="2. 두 번째 뜻 (선택)" 
+                      value={addMeaning2}
+                      onChange={(e) => setAddMeaning2(e.target.value)}
+                      className="sheet-sub-input"
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="3. 세 번째 뜻 (선택)" 
+                      value={addMeaning3}
+                      onChange={(e) => setAddMeaning3(e.target.value)}
+                      className="sheet-sub-input"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 뉘앙스 / 상세 설명 */}
+              <div className="form-group">
+                <label className="form-label">
+                  {addType === 'word' ? '친절한 뉘앙스 풀이' : addType === 'grammar' ? '문법 패턴 설명' : '숙어 뜻 & 대화 맥락'}
+                </label>
+                <textarea 
+                  rows={2}
+                  placeholder={
+                    addType === 'word' 
+                      ? '어떤 상황에서 원어민들이 주로 사용하는지 뉘앙스를 적어보세요.' 
+                      : addType === 'grammar' 
+                      ? '이 문법이 쓰이는 원리와 핵심 규칙을 설명해주세요.' 
+                      : '이 표현이 쓰이는 실제 회화 상황과 정확한 한국어 뜻을 적어보세요.'
+                  }
+                  value={addNuance}
+                  onChange={(e) => setAddNuance(e.target.value)}
+                  className="sheet-textarea"
+                />
+              </div>
+
+              {/* 예문 (선택) */}
+              <div className="form-group">
+                <label className="form-label">나만의 예문 (선택)</label>
+                <input 
+                  type="text" 
+                  placeholder="예: She remained resilient despite many challenges." 
+                  value={addSentence}
+                  onChange={(e) => setAddSentence(e.target.value)}
+                  className="sheet-sub-input"
+                />
+              </div>
+
+              {/* 하단 버튼 바 */}
+              <div className="sheet-actions-row">
+                <button 
+                  type="button" 
+                  className="sheet-cancel-btn"
+                  onClick={() => setIsAddModalOpen(false)}
+                >
+                  취소
+                </button>
+                <button 
+                  type="submit" 
+                  className="sheet-submit-btn"
+                >
+                  서재에 저장하기
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

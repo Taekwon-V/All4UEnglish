@@ -289,6 +289,92 @@ export const GeminiService = {
     };
   },
 
+  /**
+   * 사용자가 직접 입력한 단어/문법/숙어 표현에 대해
+   * AI로 품사, 사전적 의미 3개, 뉘앙스/설명, 예문을 원터치 자동 완성
+   */
+  lookupExpression: async (type, expression) => {
+    if (!expression || !expression.trim()) return null;
+    const apiKey = getApiKey();
+    const cleanExpr = expression.trim();
+
+    if (!apiKey) {
+      if (type === 'word') {
+        return {
+          partOfSpeech: '동사',
+          dictionaryMeanings: ['달성하다', '성취하다', '이루다'],
+          nuanceKo: `${cleanExpr}에 대한 원어민식 자연스러운 뉘앙스와 활용법입니다.`,
+          phonetic: '',
+          sampleSentence: `I am trying to ${cleanExpr} my goals step by step.`
+        };
+      } else if (type === 'grammar') {
+        return {
+          tag: 'to+V',
+          explanation: `${cleanExpr} 구문은 일상 회화에서 자주 쓰이는 핵심 문법 패턴입니다.`,
+          sampleSentence: `You should be ready to ${cleanExpr} when the time comes.`
+        };
+      } else {
+        return {
+          roleTag: '동사구',
+          meaning: `${cleanExpr}에 해당하는 자연스러운 숙어 표현 뜻입니다.`,
+          sampleSentence: `It helped us ${cleanExpr} much more effectively.`
+        };
+      }
+    }
+
+    const prompt = `
+당신은 한국인을 위한 최고 수준의 영어 튜터입니다.
+사용자가 직접 서재에 등록하려는 영어 표현: "${cleanExpr}" (유형: ${type})에 대해 사전적/문법적 정보를 분석하여 아래 JSON으로 반환하세요.
+
+[유형별 반환 JSON 스키마]:
+${type === 'word' ? `
+{
+  "partOfSpeech": "동사 / 명사 / 형용사 / 부사 중 가장 대표적인 품사 1개",
+  "dictionaryMeanings": ["대표 사전 의미 1", "대표 사전 의미 2", "대표 사전 의미 3"],
+  "nuanceKo": "원어민이 실제로 쓸 때의 느낌과 활용 뉘앙스를 따뜻하고 친절하게 설명 (1~2줄)",
+  "phonetic": "/발음기호/",
+  "sampleSentence": "이 단어가 쓰인 자연스러운 실생활 영어 예문 1개"
+}
+` : type === 'grammar' ? `
+{
+  "tag": "to+V / P.P. / V-ing / 조동사+V / 접속·가정 / 수동태 / 비교급 중 가장 적절한 구문 결합 형태 1개",
+  "explanation": "이 문법 패턴이 문장에서 쓰이는 핵심 규칙과 뉘앙스를 1~2줄로 친절하게 설명",
+  "sampleSentence": "이 문법 패턴이 쓰인 자연스러운 실생활 영어 예문 1개"
+}
+` : `
+{
+  "roleTag": "동사구 / 형용사구 / 부사구 / 전치사구 / 대화 관용구 중 가장 적절한 구문 역할 1개",
+  "meaning": "이 숙어의 실제 일상 대화에서의 정확한 한국어 뜻",
+  "sampleSentence": "이 숙어가 쓰인 자연스러운 실생활 영어 예문 1개"
+}
+`}
+오직 JSON만 응답하세요.
+`;
+
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: "application/json"
+          }
+        })
+      });
+
+      if (!response.ok) throw new Error(`Gemini Error: ${response.statusText}`);
+      const data = await response.json();
+      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      return JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
+    } catch (e) {
+      console.error('lookupExpression 에러:', e);
+      return null;
+    }
+  },
+
   fallbackVariations: (type, targetName) => {
     const clean = (targetName || '').replace(/["']/g, '').trim();
     if (type === 'word') {
