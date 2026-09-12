@@ -282,6 +282,50 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     setAddedItems({ words: {}, grammar: false, idioms: {} });
   };
 
+  // 11. 오늘의 추천 표현 즉시 담기 및 AI 분석 실행 (문장학습 100% 저장)
+  const handleSelectStarterPreset = async (item) => {
+    const raw = item.text;
+    setInputText(raw);
+    setTranslationText(item.trans);
+    setOriginalInputText(raw);
+
+    // 1) 문장학습에 즉시 영구 저장
+    const saved = StorageService.saveSentence({
+      text: raw,
+      originalText: raw,
+      translation: item.trans,
+      source: '오늘의 추천 표현',
+      tags: [item.theme || '추천']
+    });
+
+    const newSentence = saved[0];
+    setSavedSentenceId(newSentence?.id);
+    setAddedItems({ words: {}, grammar: false, idioms: {} });
+    setWordToast('✨ 문장학습에 저장되었습니다! AI 분석 중...');
+
+    if (onSentenceAdded) {
+      onSentenceAdded(newSentence);
+    }
+
+    // 2) AI 단어/문법/숙어 분석 자동 실행
+    setIsAnalyzing(true);
+    try {
+      const result = await GeminiService.discoverFromSentence(raw);
+      setAnalysisResult(result);
+      if (result.translation) {
+        setTranslationText(result.translation);
+      }
+      setWordToast('✨ 문장과 AI 추천 어휘가 모두 준비되었습니다! 📚');
+      setTimeout(() => setWordToast(null), 3000);
+    } catch (e) {
+      console.error('추천 표현 AI 분석 실패:', e);
+      setWordToast('✨ 문장학습에 저장 완료되었습니다!');
+      setTimeout(() => setWordToast(null), 2400);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   return (
     <div className="universal-input-container">
       {/* 사진 영역 크롭 모달 */}
@@ -483,21 +527,18 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
               <Compass size={14} />
               <span>오늘의 추천 표현</span>
             </div>
-            <span className="starter-hint">터치하면 문장창에 쏙 담겨요 👇</span>
+            <span className="starter-hint">터치하면 문장학습에 바로 담겨요 👇</span>
           </div>
           <div className="starter-list">
             {STARTER_PRESETS.map((item, i) => (
               <div 
                 key={i} 
                 className="starter-item"
-                onClick={() => {
-                  setInputText(item.text);
-                  setTranslationText(item.trans);
-                }}
+                onClick={() => handleSelectStarterPreset(item)}
               >
                 <div className="starter-item-header">
                   <span className="starter-tag">{item.theme}</span>
-                  <span className="starter-action-hint">담기 +</span>
+                  <span className="starter-action-hint">문장 담기 +</span>
                 </div>
                 <div className="starter-en">{item.text}</div>
                 <div className="starter-ko">{item.trans}</div>
