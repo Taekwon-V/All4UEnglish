@@ -1,12 +1,22 @@
 # 📋 All4UEnglish 프로젝트 인수인계 및 현황 보고서 (Handover Guide)
 
-> **최종 갱신 일시**: 2026-09-12 22:52  
-> **진행 상태**: 요구사항 2차 고도화(문장 중심 입력 $\rightarrow$ 단어/문법/숙어 파생 및 동적 예문 생성 $\rightarrow$ 플레이리스트 반복 청취 $\rightarrow$ 암기 테스트) 전체 구현 및 빌드 검증 완료  
+> **최종 갱신 일시**: 2026-09-13 00:06  
+> **진행 상태**: Vercel 프로덕션 실서버 배포 완료 & Firebase Cloud Firestore DB 연동 완료 (Hosting 서비스 정리 완료)  
 > **핵심 철학**: 안드레 카파시의 *Zero-Bloat*, *Deterministic Closed-Loop*, *Micro-Milestones* 준수
 
 ---
 
-## 1. 최신 아키텍처 개요 (5대 핵심 모듈)
+## 1. 인프라 및 아키텍처 역할 분담
+* **웹 호스팅 / CDN**: **Vercel** (`https://all4-u-english.vercel.app`)
+  - GitHub `Taekwon-V/All4UEnglish` 저장소의 `main` 브랜치 자동 빌드 및 배포
+  - 글로벌 엣지 CDN 및 SPA Rewrite 라우팅 완벽 지원
+* **데이터베이스**: **Google Cloud Firestore** (`all4uenglish`, 서울 리전 `asia-northeast3`)
+  - 문장, 단어, 문법, 숙어, 플레이리스트 데이터의 실시간 클라우드 동기화
+* **불필요한 리소스 정리**: Firebase Hosting 서비스 비활성화 및 설정 제거 완료
+
+---
+
+## 2. 최신 아키텍처 개요 (5대 핵심 모듈)
 
 ```mermaid
 graph TD
@@ -26,7 +36,7 @@ graph TD
 
 ---
 
-## 2. 5대 핵심 기능 및 화면 구성
+## 3. 5대 핵심 기능 및 화면 구성
 
 | 모듈명 | 컴포넌트 경로 | 주요 기능 |
 | :--- | :--- | :--- |
@@ -38,16 +48,9 @@ graph TD
 
 ---
 
-## 3. 실행 방법
+## 4. 실행 및 접속 URL
 
-```bash
-# 개발 서버 가동
-npm run dev
-
-# 프로덕션 빌드 검증 (2.1초 완료, 0개 에러)
-npm run build
-```
-
-* **PC 브라우저**: [http://localhost:5173/](http://localhost:5173/)
-* **갤럭시 스마트폰 (동일 Wi-Fi)**: [http://192.168.0.11:5173/](http://192.168.0.11:5173/)
+* **Vercel 실서버 프로덕션 URL**: 👉 **[https://all4-u-english.vercel.app](https://all4-u-english.vercel.app)**
+* **로컬 개발 서버**: [http://localhost:5173/](http://localhost:5173/)
+* **갤럭시 스마트폰 (동일 Wi-Fi 로컬)**: [http://192.168.0.11:5173/](http://192.168.0.11:5173/)
 * **레고 블록 플레이그라운드**: [http://localhost:5173/?block=AuthGate](http://localhost:5173/?block=AuthGate)

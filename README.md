@@ -5,8 +5,12 @@
 
 [![Vite](https://img.shields.io/badge/Vite-6.4-646CFF?logo=vite)](https://vitejs.dev/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev/)
+[![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?logo=vercel)](https://all4-u-english.vercel.app)
+[![Firestore](https://img.shields.io/badge/Database-Firestore-FFCA28?logo=firebase)](https://console.firebase.google.com/project/all4uenglish/firestore)
 [![Gemini](https://img.shields.io/badge/Gemini_1.5_Flash-AI-4285F4?logo=google)](https://aistudio.google.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+👉 **프로덕션 라이브 접속**: [https://all4-u-english.vercel.app](https://all4-u-english.vercel.app)
 
 ---
 
