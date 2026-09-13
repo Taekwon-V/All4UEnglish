@@ -1,29 +1,41 @@
 import React, { useState } from 'react';
-import { Layers, Terminal } from 'lucide-react';
+import { Layers } from 'lucide-react';
 
 import { AuthGateBlock } from './AuthGate/AuthGateBlock';
-import { VoiceInputBlock } from './VoiceInput/VoiceInputBlock';
-import { GeminiAnalyzerBlock } from './GeminiAnalyzer/GeminiAnalyzerBlock';
-import { PassageBarBlock } from './PassageBar/PassageBarBlock';
-import { VocaCardBlock } from './VocaCard/VocaCardBlock';
-import { GrammarCardBlock } from './GrammarCard/GrammarCardBlock';
-import { RoleplayShadowingBlock } from './RoleplayShadowing/RoleplayShadowingBlock';
-import { MicroQuizBlock } from './MicroQuiz/MicroQuizBlock';
-import { WordArchiveBlock } from './WordArchive/WordArchiveBlock';
+import UniversalInput from './UniversalInput/UniversalInput';
+import SentenceManager from './SentenceManager/SentenceManager';
+import StudyLibrary from './StudyLibrary/StudyLibrary';
 import { RadioPlayerBlock } from './RadioPlayer/RadioPlayerBlock';
+import RetentionTest from './RetentionTest/RetentionTest';
 
-// 10대 독립 레고 블록 전체 레지스트리
+// 5대 핵심 모듈 및 보안 게이트 러너 레지스트리
 export const REGISTERED_BLOCKS = {
   [AuthGateBlock.id]: AuthGateBlock,
-  [VoiceInputBlock.id]: VoiceInputBlock,
-  [GeminiAnalyzerBlock.id]: GeminiAnalyzerBlock,
-  [PassageBarBlock.id]: PassageBarBlock,
-  [VocaCardBlock.id]: VocaCardBlock,
-  [GrammarCardBlock.id]: GrammarCardBlock,
-  [RoleplayShadowingBlock.id]: RoleplayShadowingBlock,
-  [MicroQuizBlock.id]: MicroQuizBlock,
-  [WordArchiveBlock.id]: WordArchiveBlock,
-  [RadioPlayerBlock.id]: RadioPlayerBlock
+  UniversalInput: {
+    id: 'UniversalInput',
+    name: '스마트 문장 등록 (카메라/음성/텍스트)',
+    description: '사진 영역 크롭 OCR, 음성 STT, 직접 입력 및 AI 서재 연결',
+    Component: UniversalInput
+  },
+  SentenceManager: {
+    id: 'SentenceManager',
+    name: '문장 관리 및 플레이리스트',
+    description: '문장 학습, AI 문법 점검, 단어 추출 및 플레이리스트 구성',
+    Component: SentenceManager
+  },
+  StudyLibrary: {
+    id: 'StudyLibrary',
+    name: '서재 (단어·문법·숙어 자산)',
+    description: '단어장/문법/숙어 3대 학습 자산 및 AI 파생 예문 무한 생성',
+    Component: StudyLibrary
+  },
+  [RadioPlayerBlock.id]: RadioPlayerBlock,
+  RetentionTest: {
+    id: 'RetentionTest',
+    name: '망각방지 퀴즈',
+    description: '사전적 의미 기반 4지선다 퀴즈 및 오답 재학습',
+    Component: RetentionTest
+  }
 };
 
 export function StandaloneRunner() {
@@ -32,18 +44,11 @@ export function StandaloneRunner() {
     return params.get('block') || AuthGateBlock.id;
   });
 
-  const [eventLogs, setEventLogs] = useState([]);
-
   const handleSelectBlock = (blockId) => {
     setActiveBlockId(blockId);
     const url = new URL(window.location.href);
     url.searchParams.set('block', blockId);
     window.history.pushState({}, '', url);
-  };
-
-  const addLog = (title, data) => {
-    const time = new Date().toLocaleTimeString();
-    setEventLogs(prev => [{ time, title, data }, ...prev.slice(0, 9)]);
   };
 
   const currentBlock = REGISTERED_BLOCKS[activeBlockId] || AuthGateBlock;
@@ -74,8 +79,8 @@ export function StandaloneRunner() {
         boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Layers size={20} color="#FF7A59" />
-          <span style={{ fontWeight: 700, fontSize: '15px' }}>All4UEnglish Lego Playground</span>
+          <Layers size={20} color="#059669" />
+          <span style={{ fontWeight: 700, fontSize: '15px' }}>All4UEnglish Block Runner</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -102,112 +107,18 @@ export function StandaloneRunner() {
         </div>
       </header>
 
-      {/* 중앙 메인: 갤럭시 S26 뷰포트 프레임 + 우측 이벤트 로그 */}
-      <div style={{
-        display: 'flex',
-        gap: '24px',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
+      {/* 블록 렌더링 컨테이너 */}
+      <main style={{
         width: '100%',
-        maxWidth: '900px'
+        maxWidth: '840px',
+        backgroundColor: '#FFFFFF',
+        borderRadius: '16px',
+        overflow: 'hidden',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+        minHeight: '600px'
       }}>
-        {/* 스마트폰 뷰포트 */}
-        <div style={{
-          width: '100%',
-          maxWidth: '430px',
-          minHeight: '840px',
-          maxHeight: '90vh',
-          background: 'var(--bg-canvas)',
-          borderRadius: '36px',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 10px #2D3748',
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          {/* 모바일 펀치홀 카메라 */}
-          <div style={{
-            position: 'sticky',
-            top: '10px',
-            alignSelf: 'center',
-            width: '12px',
-            height: '12px',
-            borderRadius: '50%',
-            background: '#1A202C',
-            zIndex: 999,
-            marginBottom: '-12px'
-          }} />
-
-          {/* 블록 컴포넌트 마운트 */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <BlockComponent
-              data={currentBlock.mockData}
-              isStandalone={true}
-              onLoginSuccess={(user) => addLog('✅ Login Success', user)}
-              onBlocked={(email) => addLog('⛔ Login Blocked', email)}
-              onTextSubmit={(text) => addLog('📝 Text Submitted', text)}
-              onAnalyzed={(res) => addLog('✨ AI Analysis Done', res)}
-              onWordStatusChange={(id, st) => addLog(`Word ${st}`, id)}
-              onBookmarkToggle={(id) => addLog('Bookmark toggle', id)}
-              onShadowingComplete={(score) => addLog('🎙️ Shadowing Score', score)}
-              onQuizComplete={(sc) => addLog('🏆 Quiz Complete', sc)}
-              onEvent={(name, payload) => addLog(`Event: ${name}`, payload)}
-            />
-          </div>
-        </div>
-
-        {/* 이벤트 실시간 출력 터미널 (우측) */}
-        <div style={{
-          width: '340px',
-          background: '#1A201C',
-          borderRadius: '16px',
-          border: '1px solid #2D3748',
-          padding: '16px',
-          color: '#E2E8F0',
-          fontSize: '12px',
-          fontFamily: 'monospace',
-          maxHeight: '600px',
-          overflowY: 'auto'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: '#10B981',
-            fontWeight: 700,
-            marginBottom: '12px',
-            borderBottom: '1px solid #2D3748',
-            paddingBottom: '8px'
-          }}>
-            <Terminal size={16} />
-            <span>Closed-Loop Event Inspector</span>
-          </div>
-
-          {eventLogs.length === 0 ? (
-            <div style={{ color: '#718096', textAlign: 'center', padding: '24px 0' }}>
-              버튼을 누르거나 음성을 녹음하면<br />이벤트가 실시간으로 기록됩니다.
-            </div>
-          ) : (
-            eventLogs.map((log, idx) => (
-              <div key={idx} style={{
-                marginBottom: '10px',
-                padding: '8px',
-                background: '#232B25',
-                borderRadius: '8px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#A0AEC0', marginBottom: '4px' }}>
-                  <span>{log.title}</span>
-                  <span>{log.time}</span>
-                </div>
-                <div style={{ color: '#FBD38D', wordBreak: 'break-all' }}>
-                  {typeof log.data === 'object' ? JSON.stringify(log.data, null, 1) : String(log.data)}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+        <BlockComponent isStandalone={true} />
+      </main>
     </div>
   );
 }
