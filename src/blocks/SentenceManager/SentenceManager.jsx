@@ -647,53 +647,54 @@ export default function SentenceManager({ onPlayPlaylist }) {
                   type="button" 
                   className="exp-action-btn master-btn"
                   onClick={(e) => handleMarkAsMastered(item.id, e)}
+                  title="외웠어요 (학습 완료 처리)"
                 >
-                  <Check size={14} />
-                  <span>외웠어요 (학습 완료)</span>
+                  <Check size={15} />
+                  <span>학습완료</span>
                 </button>
               ) : (
                 <button 
                   type="button" 
                   className="exp-action-btn review-btn"
                   onClick={(e) => handleMarkAsLearning(item.id, e)}
+                  title="다시 학습하기"
                 >
-                  <RotateCcw size={13} />
-                  <span>다시 학습하기</span>
+                  <RotateCcw size={14} />
+                  <span>다시학습</span>
                 </button>
               )}
 
               <button 
                 type="button" 
-                className="exp-action-btn edit-btn"
+                className="exp-action-btn icon-only-btn edit-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleStartEdit(item);
                 }}
                 title="문장 수정 및 AI 문법 점검"
               >
-                <Edit3 size={13} />
-                <span>문장 수정</span>
+                <Edit3 size={15} />
               </button>
 
               <button 
                 type="button" 
-                className="exp-action-btn playlist-btn"
+                className="exp-action-btn icon-only-btn playlist-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   setTargetSentenceForPl(item);
                 }}
+                title="플레이리스트 담기"
               >
-                <Plus size={14} />
-                <span>플레이리스트 담기</span>
+                <Plus size={17} />
               </button>
 
               <button 
                 type="button" 
-                className="exp-action-btn delete-btn"
+                className="exp-action-btn icon-only-btn delete-btn"
                 onClick={(e) => handleDeleteSentence(item.id, e)}
                 title="문장 삭제"
               >
-                <Trash2 size={14} />
+                <Trash2 size={15} />
               </button>
             </div>
 
