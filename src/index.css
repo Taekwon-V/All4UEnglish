@@ -137,6 +137,47 @@ html, body {
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04);
 }
 
+/* =========================================================================
+   Global Modals & Popups (Strict Screen Centering & Never Cut Off)
+   모든 팝업 완벽한 화면 정중앙 배치 & 모바일 하단 네비/툴바 잘림 원천 방지
+   ========================================================================= */
+.modal-backdrop,
+.crop-modal-backdrop,
+.blocked-modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  z-index: 99999 !important; /* 하단 네비(z-index: 1000)보다 훨씬 위 */
+  display: flex !important;
+  align-items: center !important; /* 무조건 수직 중앙 */
+  justify-content: center !important; /* 무조건 수평 중앙 */
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  background: rgba(15, 23, 42, 0.7) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+
+.modal-sheet,
+.direct-add-sheet,
+.crop-modal-sheet,
+.blocked-modal-card {
+  margin: auto !important; /* 플렉스 중앙 정렬 안전장치 */
+  max-height: calc(100dvh - 36px) !important;
+  max-height: min(85dvh, 620px) !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  border-radius: 20px !important; /* 4개 모서리 모두 둥글게 */
+  box-sizing: border-box !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25) !important;
+}
+
 /* Common Interactive Micro-Animations */
 .btn-spring {
   transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s;

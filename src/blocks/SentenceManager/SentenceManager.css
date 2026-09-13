@@ -1068,28 +1068,49 @@
   cursor: not-allowed;
 }
 
-/* 모달 */
+/* 모달 (중앙 정렬 & 아래 잘림 방지) */
 .modal-backdrop {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(4px);
-  z-index: 9999;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 99999;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .modal-sheet {
   background: #ffffff;
   border-radius: 20px;
-  padding: 22px;
+  padding: 22px 20px;
   width: 100%;
-  max-width: 380px;
+  max-width: 400px;
+  max-height: min(85dvh, 600px);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  margin: auto;
+  animation: modalPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPopIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.96) translateY(8px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1) translateY(0); 
+  }
 }
 
 .modal-sheet h3 {
@@ -1210,9 +1231,10 @@
 /* ================= 문장 수정 및 AI 문법 점검 모달 스타일 ================= */
 .edit-sentence-sheet {
   max-width: 440px;
-  max-height: 90vh;
+  max-height: min(84dvh, 600px);
   overflow-y: auto;
   gap: 14px;
+  margin: auto;
 }
 
 .edit-sheet-header {

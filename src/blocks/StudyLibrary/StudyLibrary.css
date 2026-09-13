@@ -695,37 +695,46 @@
   color: #059669;
 }
 
-/* ================= 직접 추가 바텀시트 / 모달 ================= */
+/* ================= 직접 추가 모달 (중앙 정렬 & 아래 잘림 방지) ================= */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 1000;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 99999;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .direct-add-sheet {
   background: #ffffff;
   width: 100%;
-  max-width: 480px;
-  border-radius: 24px 24px 0 0;
-  padding: 20px 20px calc(var(--safe-bottom, 16px) + 20px);
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
+  max-width: 420px;
+  border-radius: 20px;
+  padding: 22px 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-height: 88vh;
+  max-height: min(85dvh, 600px);
   overflow-y: auto;
-  animation: slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  margin: auto;
+  animation: modalPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+@keyframes modalPopIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.96) translateY(8px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1) translateY(0); 
+  }
 }
 
 .sheet-header {
