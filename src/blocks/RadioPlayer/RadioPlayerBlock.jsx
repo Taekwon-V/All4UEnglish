@@ -40,6 +40,20 @@ export function RadioPlayerComponent({
     }
   }, [targetPlaylist]);
 
+  // 사용자가 보유한 주제(태그) 목록 추출
+  const allExistingTopics = React.useMemo(() => {
+    const set = new Set();
+    sentences.forEach(s => {
+      if (Array.isArray(s.tags)) {
+        s.tags.forEach(t => {
+          const clean = t.replace(/^#/, '').trim();
+          if (clean) set.add(clean);
+        });
+      }
+    });
+    return Array.from(set);
+  }, [sentences]);
+
   // 현재 활성화된 재생 트랙 목록
   const currentTracks = React.useMemo(() => {
     if (selectedPlaylistId === 'learning') {
@@ -52,6 +66,14 @@ export function RadioPlayerComponent({
     }
     if (selectedPlaylistId === 'all') {
       return sentences;
+    }
+    if (selectedPlaylistId.startsWith('tag:')) {
+      const tag = selectedPlaylistId.replace('tag:', '');
+      const filtered = sentences.filter(s => {
+        const tags = Array.isArray(s.tags) ? s.tags.map(t => t.replace(/^#/, '').trim()) : [];
+        return tags.includes(tag);
+      });
+      return filtered.length > 0 ? filtered : sentences;
     }
     if (targetPlaylist && targetPlaylist.sentenceIds && selectedPlaylistId === targetPlaylist.id) {
       const filtered = sentences.filter(s => targetPlaylist.sentenceIds.includes(s.id));
@@ -242,14 +264,37 @@ export function RadioPlayerComponent({
             setSelectedPlaylistId(e.target.value);
           }}
         >
-          <option value="learning">📖 학습 중인 문장 ({sentences.filter(s => s.status !== 'mastered').length}개)</option>
-          <option value="mastered">✅ 학습 완료된 문장 ({sentences.filter(s => s.status === 'mastered').length}개)</option>
-          <option value="all">📂 전체 문장 ({sentences.length}개)</option>
-          {playlists.map(pl => (
-            <option key={pl.id} value={pl.id}>
-              🎧 {pl.title} ({pl.sentenceIds?.length || 0}개)
-            </option>
-          ))}
+          <optgroup label="기본 학습 목록">
+            <option value="learning">📖 학습 중인 문장 ({sentences.filter(s => s.status !== 'mastered').length}개)</option>
+            <option value="mastered">✅ 학습 완료된 문장 ({sentences.filter(s => s.status === 'mastered').length}개)</option>
+            <option value="all">📂 전체 문장 ({sentences.length}개)</option>
+          </optgroup>
+
+          {allExistingTopics.length > 0 && (
+            <optgroup label="🏷️ 주제(태그)별 바로 듣기">
+              {allExistingTopics.map(topic => {
+                const count = sentences.filter(s => {
+                  const tags = Array.isArray(s.tags) ? s.tags.map(t => t.replace(/^#/, '').trim()) : [];
+                  return tags.includes(topic);
+                }).length;
+                return (
+                  <option key={'tag:' + topic} value={'tag:' + topic}>
+                    🏷️ #{topic} ({count.toLocaleString()}개 문장)
+                  </option>
+                );
+              })}
+            </optgroup>
+          )}
+
+          {playlists.length > 0 && (
+            <optgroup label="🎧 나만의 플레이리스트">
+              {playlists.map(pl => (
+                <option key={pl.id} value={pl.id}>
+                  🎧 {pl.title} ({pl.sentenceIds?.length || 0}개)
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
       </div>
 

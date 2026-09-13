@@ -44,6 +44,7 @@ export default function SentenceManager({ onPlayPlaylist }) {
   const [isCreatingPl, setIsCreatingPl] = useState(false);
   const [newPlTitle, setNewPlTitle] = useState('');
   const [newPlDesc, setNewPlDesc] = useState('');
+  const [newPlTopic, setNewPlTopic] = useState('');
 
   // 문장 -> 플레이리스트 담기 모달
   const [targetSentenceForPl, setTargetSentenceForPl] = useState(null);
@@ -60,10 +61,9 @@ export default function SentenceManager({ onPlayPlaylist }) {
     loadData();
   }, []);
 
-  // 전체 문장에서 사용자가 등록한 모든 고유 주제(태그) 목록 추출 (기본 주제 '주제없음' 포함)
+  // 전체 문장에서 사용자가 등록한 모든 고유 주제(태그) 목록 추출
   const allExistingTopics = useMemo(() => {
     const set = new Set();
-    set.add('주제없음');
     sentences.forEach(s => {
       if (Array.isArray(s.tags)) {
         s.tags.forEach(t => {
@@ -72,8 +72,23 @@ export default function SentenceManager({ onPlayPlaylist }) {
         });
       }
     });
+    const hasUntagged = sentences.some(s => !s.tags || !Array.isArray(s.tags) || s.tags.length === 0);
+    if (hasUntagged) {
+      set.add('주제없음');
+    }
     return Array.from(set);
   }, [sentences]);
+
+  // 특정 주제(태그)에 해당하는 문장 목록 반환 헬퍼
+  const getSentencesByTopic = (topic) => {
+    return sentences.filter(s => {
+      if (topic === '주제없음') {
+        return !s.tags || !Array.isArray(s.tags) || s.tags.length === 0;
+      }
+      const tags = Array.isArray(s.tags) ? s.tags.map(t => t.replace(/^#/, '').trim()) : [];
+      return tags.includes(topic);
+    });
+  };
 
   // 학습 중 vs 학습 완료 분리
   const currentBaseSentences = useMemo(() => {
@@ -259,18 +274,53 @@ export default function SentenceManager({ onPlayPlaylist }) {
     }
   };
 
+  // 특정 주제로 플레이리스트 생성 모달 열기
+  const handleOpenCreateModalWithTopic = (topic) => {
+    const matching = getSentencesByTopic(topic);
+    setNewPlTopic(topic);
+    setNewPlTitle(`[#${topic}] 문장 모음`);
+    setNewPlDesc(`${topic} 주제 문장 (${matching.length.toLocaleString()}개)`);
+    setIsCreatingPl(true);
+  };
+
+  // 모달 내 주제 선택 변경 시
+  const handleTopicSelectInModal = (topic) => {
+    setNewPlTopic(topic);
+    if (topic) {
+      const cnt = getSentencesByTopic(topic).length;
+      if (!newPlTitle || newPlTitle.startsWith('[#')) {
+        setNewPlTitle(`[#${topic}] 문장 모음`);
+      }
+      if (!newPlDesc || newPlDesc.includes('주제 문장')) {
+        setNewPlDesc(`${topic} 주제 문장 (${cnt.toLocaleString()}개)`);
+      }
+    }
+  };
+
   // 플레이리스트 생성
   const handleCreatePlaylist = () => {
     if (!newPlTitle.trim()) return;
+
+    let sentenceIds = [];
+    if (newPlTopic) {
+      sentenceIds = getSentencesByTopic(newPlTopic).map(s => s.id);
+    }
+
     StorageService.savePlaylist({
       title: newPlTitle.trim(),
-      description: newPlDesc.trim() || '맞춤형 문장 플레이리스트',
-      sentenceIds: []
+      description: newPlDesc.trim() || (newPlTopic ? `${newPlTopic} 주제 문장 모음` : '맞춤형 문장 플레이리스트'),
+      sentenceIds
     });
+
+    setToastMessage(`🎉 '${newPlTitle.trim()}' 플레이리스트가 생성되었습니다! (${sentenceIds.length.toLocaleString()}개 문장 담김)`);
+    setTimeout(() => setToastMessage(null), 3000);
+
     setNewPlTitle('');
     setNewPlDesc('');
+    setNewPlTopic('');
     setIsCreatingPl(false);
     loadData();
+    setActiveSection('playlists');
   };
 
   // 플레이리스트에 담기
@@ -884,29 +934,50 @@ export default function SentenceManager({ onPlayPlaylist }) {
 
           {/* 주제별 모드일 때: 내가 등록/사용한 주제 목록 칩 필터 */}
           {filterMode === 'tag' && (
-            <div className="topic-filter-chips-row">
-              <button 
-                type="button" 
-                className={`topic-filter-chip ${selectedTopic === 'all' ? 'active' : ''}`}
-                onClick={() => setSelectedTopic('all')}
-              >
-                전체 주제
-              </button>
-              {allExistingTopics.length === 0 ? (
-                <span className="no-topic-chip-msg">등록된 주제가 없습니다. 문장을 펼쳐 주제를 추가해보세요!</span>
-              ) : (
-                allExistingTopics.map(t => (
-                  <button 
-                    key={t}
-                    type="button" 
-                    className={`topic-filter-chip ${selectedTopic === t ? 'active' : ''}`}
-                    onClick={() => setSelectedTopic(t)}
+            <>
+              <div className="topic-filter-chips-row">
+                <button 
+                  type="button" 
+                  className={`topic-filter-chip ${selectedTopic === 'all' ? 'active' : ''}`}
+                  onClick={() => setSelectedTopic('all')}
+                >
+                  전체 주제
+                </button>
+                {allExistingTopics.length === 0 ? (
+                  <span className="no-topic-chip-msg">등록된 주제가 없습니다. 문장을 펼쳐 주제를 추가해보세요!</span>
+                ) : (
+                  allExistingTopics.map(t => (
+                    <button 
+                      key={t}
+                      type="button" 
+                      className={`topic-filter-chip ${selectedTopic === t ? 'active' : ''}`}
+                      onClick={() => setSelectedTopic(t)}
+                    >
+                      #{t}
+                    </button>
+                  ))
+                )}
+              </div>
+
+              {selectedTopic !== 'all' && (
+                <div className="topic-action-banner">
+                  <div className="topic-action-text">
+                    <Tag size={14} color="#059669" />
+                    <span>
+                      <strong>#{selectedTopic}</strong> 주제 ({getSentencesByTopic(selectedTopic).length.toLocaleString()}문장)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="topic-create-pl-btn"
+                    onClick={() => handleOpenCreateModalWithTopic(selectedTopic)}
                   >
-                    #{t}
+                    <Headphones size={14} />
+                    <span>이 주제로 플레이리스트 생성</span>
                   </button>
-                ))
+                </div>
               )}
-            </div>
+            </>
           )}
 
           {/* 문장 아코디언 리스트 */}
@@ -942,14 +1013,49 @@ export default function SentenceManager({ onPlayPlaylist }) {
       {/* 2. 플레이리스트 관리 탭 */}
       {activeSection === 'playlists' && (
         <div className="playlists-section">
+          {/* 주제별 빠른 플레이리스트 생성 카드 */}
+          {allExistingTopics.filter(t => t !== '주제없음').length > 0 && (
+            <div className="quick-topic-pl-card">
+              <div className="quick-topic-pl-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Tag size={15} color="#059669" />
+                  <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#0f172a' }}>주제별 빠른 플레이리스트 생성</span>
+                </div>
+                <span style={{ fontSize: '11px', color: '#64748b' }}>터치 시 해당 주제 전체로 생성</span>
+              </div>
+              <div className="quick-topic-chips-wrap">
+                {allExistingTopics.filter(t => t !== '주제없음').map(t => {
+                  const count = getSentencesByTopic(t).length;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      className="quick-topic-create-chip"
+                      onClick={() => handleOpenCreateModalWithTopic(t)}
+                    >
+                      <span>#{t}</span>
+                      <span className="chip-badge">{count.toLocaleString()}개</span>
+                      <Plus size={12} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="playlist-create-bar">
             <button 
               type="button" 
               className="create-pl-trigger-btn"
-              onClick={() => setIsCreatingPl(true)}
+              onClick={() => {
+                setNewPlTopic('');
+                setNewPlTitle('');
+                setNewPlDesc('');
+                setIsCreatingPl(true);
+              }}
             >
               <Plus size={16} />
-              <span>새 플레이리스트 만들기</span>
+              <span>새 플레이리스트 직접 만들기</span>
             </button>
           </div>
 
@@ -1015,28 +1121,75 @@ export default function SentenceManager({ onPlayPlaylist }) {
         <div className="modal-backdrop">
           <div className="modal-sheet">
             <h3>🎧 새 플레이리스트 만들기</h3>
-            <p className="modal-guide">산책할 때나 가사일할 때 반복해서 들을 문장 모음집입니다.</p>
+            <p className="modal-guide">산책할 때나 출퇴근할 때 반복해서 들을 맞춤형 문장 모음집입니다.</p>
 
-            <input 
-              type="text" 
-              placeholder="예: 오늘의 카페 주문 표현들" 
-              value={newPlTitle}
-              onChange={(e) => setNewPlTitle(e.target.value)}
-              className="modal-input"
-            />
-            <input 
-              type="text" 
-              placeholder="설명 (선택)" 
-              value={newPlDesc}
-              onChange={(e) => setNewPlDesc(e.target.value)}
-              className="modal-input"
-            />
+            <div className="modal-field">
+              <label className="modal-field-label">주제(태그) 선택하여 담기</label>
+              <select
+                value={newPlTopic}
+                onChange={(e) => handleTopicSelectInModal(e.target.value)}
+                className="modal-input modal-select"
+              >
+                <option value="">직접 담기 (빈 플레이리스트)</option>
+                {allExistingTopics.filter(t => t !== '주제없음').map(t => {
+                  const cnt = getSentencesByTopic(t).length;
+                  return (
+                    <option key={t} value={t}>
+                      #{t} ({cnt.toLocaleString()}개 문장 전체)
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {newPlTopic && (
+              <div className="topic-included-notice">
+                <Check size={14} color="#059669" />
+                <span>
+                  <strong>#{newPlTopic}</strong> 주제의 <strong>{getSentencesByTopic(newPlTopic).length.toLocaleString()}개</strong> 문장이 자동으로 포함됩니다.
+                </span>
+              </div>
+            )}
+
+            <div className="modal-field">
+              <label className="modal-field-label">플레이리스트 이름</label>
+              <input 
+                type="text" 
+                placeholder="예: [#BUI] 문장 모음" 
+                value={newPlTitle}
+                onChange={(e) => setNewPlTitle(e.target.value)}
+                className="modal-input"
+              />
+            </div>
+
+            <div className="modal-field">
+              <label className="modal-field-label">설명 (선택)</label>
+              <input 
+                type="text" 
+                placeholder="설명 (선택)" 
+                value={newPlDesc}
+                onChange={(e) => setNewPlDesc(e.target.value)}
+                className="modal-input"
+              />
+            </div>
 
             <div className="modal-actions">
-              <button type="button" className="modal-btn cancel" onClick={() => setIsCreatingPl(false)}>
+              <button 
+                type="button" 
+                className="modal-btn cancel" 
+                onClick={() => {
+                  setIsCreatingPl(false);
+                  setNewPlTopic('');
+                }}
+              >
                 취소
               </button>
-              <button type="button" className="modal-btn submit" onClick={handleCreatePlaylist}>
+              <button 
+                type="button" 
+                className="modal-btn submit" 
+                onClick={handleCreatePlaylist}
+                disabled={!newPlTitle.trim()}
+              >
                 만들기
               </button>
             </div>
