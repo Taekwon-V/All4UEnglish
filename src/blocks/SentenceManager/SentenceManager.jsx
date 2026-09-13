@@ -58,6 +58,7 @@ export default function SentenceManager({ onPlayPlaylist }) {
 
   // AI 서재 학습 자산 추출 후 선택 모달 상태
   const [assetSelectionModal, setAssetSelectionModal] = useState(null);
+  const [customWordInput, setCustomWordInput] = useState('');
 
   const loadData = () => {
     setSentences(StorageService.getSentences());
@@ -565,6 +566,122 @@ export default function SentenceManager({ onPlayPlaylist }) {
     } finally {
       setExtractingMap(prev => ({ ...prev, [sId]: false }));
     }
+  };
+
+  // 문장 토큰 추출 헬퍼 (구두점 분리 및 중복 제거)
+  const getSentenceTokens = (text) => {
+    if (!text) return [];
+    const parts = text.split(/\s+/);
+    const seen = new Set();
+    const tokens = [];
+
+    parts.forEach(p => {
+      const clean = p.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '').trim();
+      if (clean && !seen.has(clean.toLowerCase())) {
+        seen.add(clean.toLowerCase());
+        tokens.push({
+          display: clean,
+          clean: clean
+        });
+      }
+    });
+
+    return tokens;
+  };
+
+  // 문장 속 단어 칩 클릭 시 추가/토글
+  const handleToggleOrAddWordFromSentence = async (wordText) => {
+    if (!wordText || !assetSelectionModal) return;
+    const clean = wordText.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '').trim();
+    if (!clean) return;
+
+    const lower = clean.toLowerCase();
+    const existingIdx = assetSelectionModal.words.findIndex(w => w.word.toLowerCase() === lower);
+
+    if (existingIdx >= 0) {
+      // 이미 단어 목록에 있으면 선택 여부만 토글
+      setAssetSelectionModal(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          words: prev.words.map((w, idx) => idx === existingIdx ? { ...w, selected: !w.selected } : w)
+        };
+      });
+      return;
+    }
+
+    // 신규 단어 즉시 추가
+    const tempId = `word_${lower}_${Date.now()}`;
+    const newWordItem = {
+      id: tempId,
+      word: clean,
+      phonetic: '',
+      partOfSpeech: '단어',
+      dictionaryMeanings: [clean],
+      nuanceKo: '',
+      selected: true,
+      loadingLookup: true
+    };
+
+    setAssetSelectionModal(prev => ({
+      ...prev,
+      words: [...prev.words, newWordItem]
+    }));
+
+    // AI 사전 조회로 뜻/품사/발음기호 비동기 보강
+    try {
+      const lookup = await GeminiService.lookupExpression('word', clean);
+      if (lookup) {
+        setAssetSelectionModal(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            words: prev.words.map(w => {
+              if (w.id === tempId) {
+                return {
+                  ...w,
+                  phonetic: lookup.phonetic || '',
+                  partOfSpeech: lookup.partOfSpeech || '단어',
+                  dictionaryMeanings: (lookup.dictionaryMeanings && lookup.dictionaryMeanings.length > 0)
+                    ? lookup.dictionaryMeanings.slice(0, 3)
+                    : [clean],
+                  nuanceKo: lookup.nuanceKo || '',
+                  loadingLookup: false
+                };
+              }
+              return w;
+            })
+          };
+        });
+      }
+    } catch (err) {
+      console.warn('단어 사전 조회 실패:', err);
+      setAssetSelectionModal(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          words: prev.words.map(w => w.id === tempId ? { ...w, loadingLookup: false } : w)
+        };
+      });
+    }
+  };
+
+  // 단어 직접 입력 추가
+  const handleAddCustomWord = () => {
+    if (!customWordInput.trim()) return;
+    handleToggleOrAddWordFromSentence(customWordInput.trim());
+    setCustomWordInput('');
+  };
+
+  // 모달 목록에서 단어 삭제
+  const handleRemoveWordFromModal = (id) => {
+    setAssetSelectionModal(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        words: prev.words.filter(w => w.id !== id)
+      };
+    });
   };
 
   // 서재 자산 선택 모달 토글 및 저장 핸들러
@@ -1668,7 +1785,63 @@ export default function SentenceManager({ onPlayPlaylist }) {
             </p>
 
             <div className="asset-sentence-preview">
-              "{assetSelectionModal.sentenceItem.text}"
+              <div className="preview-sentence-text">"{assetSelectionModal.sentenceItem.text}"</div>
+              
+              <div className="sentence-word-picker-section">
+                <div className="word-picker-title">
+                  <Sparkles size={13} color="#047857" />
+                  <span>문장 속 단어 직접 선택 (터치하여 추가/해제):</span>
+                </div>
+                <div className="sentence-word-chips">
+                  {getSentenceTokens(assetSelectionModal.sentenceItem.text).map((token) => {
+                    const addedWord = assetSelectionModal.words.find(
+                      w => w.word.toLowerCase() === token.clean.toLowerCase()
+                    );
+                    const isAdded = Boolean(addedWord);
+                    const isChecked = addedWord ? addedWord.selected : false;
+
+                    return (
+                      <button
+                        key={token.clean}
+                        type="button"
+                        className={`sentence-word-chip ${isAdded ? (isChecked ? 'chip-active' : 'chip-deselected') : 'chip-unadded'}`}
+                        onClick={() => handleToggleOrAddWordFromSentence(token.clean)}
+                        title={isAdded ? (isChecked ? '단어 선택 해제' : '단어 다시 선택') : `[${token.clean}] 단어장에 추가`}
+                      >
+                        {isAdded && isChecked && <Check size={11} strokeWidth={3} />}
+                        {isAdded && !isChecked && <span className="chip-dash">-</span>}
+                        {!isAdded && <Plus size={11} strokeWidth={2.5} />}
+                        <span>{token.display}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="custom-word-input-wrap">
+                  <input 
+                    type="text" 
+                    placeholder="단어 직접 입력..." 
+                    value={customWordInput}
+                    onChange={(e) => setCustomWordInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomWord();
+                      }
+                    }}
+                    className="custom-word-input"
+                  />
+                  <button 
+                    type="button" 
+                    className="custom-word-add-btn" 
+                    onClick={handleAddCustomWord}
+                    disabled={!customWordInput.trim()}
+                  >
+                    <Plus size={12} strokeWidth={2.5} />
+                    <span>추가</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="asset-selection-controls">
@@ -1719,11 +1892,23 @@ export default function SentenceManager({ onPlayPlaylist }) {
                             <span className="asset-check-term">{w.word}</span>
                             {w.phonetic && <span className="asset-check-phonetic">{w.phonetic}</span>}
                             {w.partOfSpeech && <span className="asset-check-pos">{w.partOfSpeech}</span>}
+                            {w.loadingLookup && <span className="asset-lookup-loading">사전 조회중...</span>}
                           </div>
                           <div className="asset-check-meanings">
-                            {w.dictionaryMeanings.join(', ')}
+                            {w.loadingLookup ? '사전 의미 분석 중...' : (w.dictionaryMeanings && w.dictionaryMeanings.length > 0 ? w.dictionaryMeanings.join(', ') : w.word)}
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          className="asset-item-remove-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveWordFromModal(w.id);
+                          }}
+                          title="목록에서 제거"
+                        >
+                          <X size={13} />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -1815,7 +2000,7 @@ export default function SentenceManager({ onPlayPlaylist }) {
                   assetSelectionModal.idioms.filter(i => i.selected).length === 0
                 }
               >
-                선택 항목 서재에 담기 ({
+                담기 ({
                   assetSelectionModal.words.filter(w => w.selected).length +
                   (assetSelectionModal.grammar?.selected ? 1 : 0) +
                   assetSelectionModal.idioms.filter(i => i.selected).length
