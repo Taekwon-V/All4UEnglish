@@ -22,6 +22,58 @@ export default function RetentionTest() {
   const [score, setScore] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
 
+  // 단어의 실제 사전적 의미(뜻) 추출 헬퍼 (장황한 뉘앙스 서술형 문장 완전 배제)
+  const getCleanWordMeaning = (w) => {
+    const lower = (w.word || '').toLowerCase().trim();
+    let dictMeanings = Array.isArray(w.dictionaryMeanings) ? w.dictionaryMeanings.filter(Boolean) : [];
+    let pos = w.partOfSpeech || '';
+
+    // 잘 알려진 기본 단어 사전 뜻 보정
+    if (lower === 'busy') {
+      dictMeanings = ["바쁜", "분주한", "통화 중인"];
+      pos = "형용사";
+    } else if (lower === 'iced') {
+      dictMeanings = ["얼음을 넣은", "차가운", "설탕을 입힌"];
+      pos = "형용사";
+    } else if (lower === 'achieve') {
+      dictMeanings = ["달성하다", "성취하다", "이루어 내다"];
+      pos = "동사";
+    } else if (lower === 'proud') {
+      dictMeanings = ["자랑스러워하는", "자부심을 느끼는", "자존심이 강한"];
+      pos = "형용사";
+    } else if (lower === 'enough') {
+      dictMeanings = ["충분한", "충분히"];
+      pos = "대명사 / 부사";
+    }
+
+    // 1순위: dictionaryMeanings 배열
+    if (dictMeanings.length > 0) {
+      const meaningStr = dictMeanings.slice(0, 3).join(', ');
+      return pos ? `${meaningStr} (${pos})` : meaningStr;
+    }
+
+    // 2순위: meaningKo (단어의 짧은 뜻)
+    if (w.meaningKo && !w.meaningKo.includes('문맥 속에서') && !w.meaningKo.includes('중요 어휘')) {
+      return pos ? `${w.meaningKo} (${pos})` : w.meaningKo;
+    }
+
+    // 3순위: nuanceKo 중 설명형 문장이 아닌 짧은 뜻인 경우에만 사용
+    if (w.nuanceKo) {
+      const isExplanation = w.nuanceKo.length > 25 || 
+        w.nuanceKo.includes('습니다') || 
+        w.nuanceKo.includes('쓰입니다') || 
+        w.nuanceKo.includes('상태') || 
+        w.nuanceKo.includes('담은 단어') || 
+        w.nuanceKo.includes('문장에서');
+      if (!isExplanation) {
+        return pos ? `${w.nuanceKo} (${pos})` : w.nuanceKo;
+      }
+    }
+
+    // fallback
+    return pos ? `[${pos}] 뜻을 가진 단어` : `${w.word}의 뜻`;
+  };
+
   // 퀴즈 데이터 생성기
   const generateQuiz = (category) => {
     let rawItems = [];
@@ -47,16 +99,24 @@ export default function RetentionTest() {
       let distractors = [];
 
       if (category === 'words') {
-        promptText = item.nuanceKo || '이 단어의 뜻에 해당하는 영어 단어는?';
+        promptText = getCleanWordMeaning(item);
         correct = item.word;
         distractors = rawItems
-          .filter(x => x.word !== correct)
+          .filter(x => (x.word || '').toLowerCase() !== (correct || '').toLowerCase())
           .map(x => x.word)
           .sort(() => 0.5 - Math.random())
           .slice(0, 3);
 
+        const fallbackDistractors = [
+          'experience', 'opportunity', 'confident', 'schedule', 
+          'journey', 'challenge', 'progress', 'inspire', 'attitude'
+        ];
+        let fbIdx = 0;
         while (distractors.length < 3) {
-          distractors.push(`선택지 ${distractors.length + 2}`);
+          const candidate = fallbackDistractors[fbIdx++];
+          if (candidate && candidate.toLowerCase() !== correct.toLowerCase() && !distractors.includes(candidate)) {
+            distractors.push(candidate);
+          }
         }
 
         const options = [correct, ...distractors].sort(() => 0.5 - Math.random());
@@ -287,7 +347,7 @@ export default function RetentionTest() {
             <p className="q-guide">
               {currentQ.type === 'scramble' 
                 ? '아래 우리말 의미에 맞게 영어 단어 블록을 순서대로 배열해 보세요:'
-                : '다음 뜻에 알맞은 올바른 영어 단어를 고르세요:'}
+                : '다음 사전적 뜻에 알맞은 올바른 영어 단어를 고르세요:'}
             </p>
             <h3 className="q-text">{currentQ.prompt}</h3>
           </div>
@@ -391,7 +451,7 @@ export default function RetentionTest() {
                   </div>
                 ) : (
                   <div className="feedback-wrong-row">
-                    <span className="wrong-label">아쉬워요! 올바른 문장:</span>
+                    <span className="wrong-label">{currentQ.type === 'choice' ? '아쉬워요! 올바른 정답 단어:' : '아쉬워요! 올바른 문장:'}</span>
                     <strong className="correct-sentence-view">{currentQ.correct}</strong>
                   </div>
                 )}
