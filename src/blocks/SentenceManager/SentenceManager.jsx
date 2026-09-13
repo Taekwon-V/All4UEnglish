@@ -4,7 +4,7 @@ import {
   Trash2, FolderPlus, Check, ChevronRight, Headphones, 
   CheckCircle2, RotateCcw, Search, Sparkles, BookOpen,
   Calendar, Tag, ChevronDown, ChevronUp, ArrowUpDown, X,
-  Wand2, Layers, Edit3, AlertCircle, RefreshCw
+  Wand2, Layers, Edit3, AlertCircle, RefreshCw, Eye, EyeOff, PenTool
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { SpeechService } from '../../services/speech';
@@ -59,6 +59,14 @@ export default function SentenceManager({ onPlayPlaylist }) {
   // AI 서재 학습 자산 추출 후 선택 모달 상태
   const [assetSelectionModal, setAssetSelectionModal] = useState(null);
   const [customWordInput, setCustomWordInput] = useState('');
+
+  // 영어가리기 / 한글가리기 셀프 학습 모드 상태
+  const [hideEnglish, setHideEnglish] = useState(false);
+  const [hideKorean, setHideKorean] = useState(false);
+  const [revealedEnMap, setRevealedEnMap] = useState({});
+  const [revealedKoMap, setRevealedKoMap] = useState({});
+  const [practiceInputs, setPracticeInputs] = useState({});
+  const [practiceResults, setPracticeResults] = useState({});
 
   const loadData = () => {
     setSentences(StorageService.getSentences());
@@ -788,6 +796,33 @@ export default function SentenceManager({ onPlayPlaylist }) {
     loadData();
   };
 
+  // 영어가리기 / 한글가리기 토글 및 개별 공개 핸들러
+  const handleToggleHideEnglish = () => {
+    setHideEnglish(prev => {
+      const next = !prev;
+      if (!next) setRevealedEnMap({});
+      return next;
+    });
+  };
+
+  const handleToggleHideKorean = () => {
+    setHideKorean(prev => {
+      const next = !prev;
+      if (!next) setRevealedKoMap({});
+      return next;
+    });
+  };
+
+  const handleToggleRevealEn = (id, e) => {
+    if (e) e.stopPropagation();
+    setRevealedEnMap(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleToggleRevealKo = (id, e) => {
+    if (e) e.stopPropagation();
+    setRevealedKoMap(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   // 개별 문장 아코디언 카드 렌더러
   const renderSentenceRow = (item) => {
     const isExpanded = !!expandedIds[item.id];
@@ -807,7 +842,29 @@ export default function SentenceManager({ onPlayPlaylist }) {
         <div className="sentence-summary-row" onClick={() => toggleExpand(item.id)}>
           {/* 1행: 영어 문장 + 발음 버튼 */}
           <div className="sentence-line-1">
-            <span className="sentence-en-text">{item.text}</span>
+            {hideEnglish && !revealedEnMap[item.id] ? (
+              <div 
+                className="sentence-masked-wrapper en-mask"
+                onClick={(e) => handleToggleRevealEn(item.id, e)}
+                title="터치하여 영어 원문 확인"
+              >
+                <EyeOff size={13} className="mask-icon" />
+                <span className="mask-text-hint">영어 가림 (터치하면 공개 👁️)</span>
+              </div>
+            ) : (
+              <span 
+                className={`sentence-en-text ${hideEnglish && revealedEnMap[item.id] ? 'is-masked-revealed' : ''}`}
+                onClick={hideEnglish ? (e) => handleToggleRevealEn(item.id, e) : undefined}
+                title={hideEnglish ? "터치하여 다시 가리기" : undefined}
+              >
+                {item.text}
+                {hideEnglish && (
+                  <span className="mask-rehide-badge" title="다시 가리기">
+                    <EyeOff size={11} /> 숨기기
+                  </span>
+                )}
+              </span>
+            )}
             <button 
               type="button" 
               className="sentence-mini-voice-btn" 
@@ -820,7 +877,29 @@ export default function SentenceManager({ onPlayPlaylist }) {
 
           {/* 2행: 한국어 번역 + 생성월 + 북마크 + 화살표 */}
           <div className="sentence-line-2">
-            <span className="sentence-ko-text">{item.translation}</span>
+            {hideKorean && !revealedKoMap[item.id] ? (
+              <div 
+                className="sentence-masked-wrapper ko-mask"
+                onClick={(e) => handleToggleRevealKo(item.id, e)}
+                title="터치하여 한글 번역 확인"
+              >
+                <EyeOff size={12} className="mask-icon" />
+                <span className="mask-text-hint">해석 가림 (터치하면 공개 👁️)</span>
+              </div>
+            ) : (
+              <span 
+                className={`sentence-ko-text ${hideKorean && revealedKoMap[item.id] ? 'is-masked-revealed' : ''}`}
+                onClick={hideKorean ? (e) => handleToggleRevealKo(item.id, e) : undefined}
+                title={hideKorean ? "터치하여 다시 가리기" : undefined}
+              >
+                {item.translation}
+                {hideKorean && (
+                  <span className="mask-rehide-badge ko-rehide" title="다시 가리기">
+                    <EyeOff size={10} /> 숨기기
+                  </span>
+                )}
+              </span>
+            )}
             <div className="sentence-meta-col">
               {shortMonth && (
                 <span className="sentence-month-chip" title={`등록일: ${dateDisplay}`}>
@@ -902,6 +981,74 @@ export default function SentenceManager({ onPlayPlaylist }) {
               >
                 <Trash2 size={15} />
               </button>
+            </div>
+
+            {/* ✍️ 영작 연습해보기 & 정답 대조 (셀프 트레이닝) */}
+            <div className="sentence-writing-practice-box">
+              <div className="writing-practice-header">
+                <div className="writing-practice-title">
+                  <PenTool size={13} color="#059669" />
+                  <span>✍️ 영작 연습해보기</span>
+                </div>
+                {practiceResults[item.id] && (
+                  <button 
+                    type="button" 
+                    className="writing-reset-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPracticeResults(prev => ({ ...prev, [item.id]: false }));
+                    }}
+                  >
+                    다시 쓰기
+                  </button>
+                )}
+              </div>
+
+              {!practiceResults[item.id] ? (
+                <div className="writing-input-row" onClick={(e) => e.stopPropagation()}>
+                  <input 
+                    type="text"
+                    className="writing-input-field"
+                    placeholder="한국어 뜻을 보며 영어 문장을 적어보세요..."
+                    value={practiceInputs[item.id] || ''}
+                    onChange={(e) => setPracticeInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setPracticeResults(prev => ({ ...prev, [item.id]: true }));
+                      }
+                    }}
+                  />
+                  <button 
+                    type="button" 
+                    className="writing-compare-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPracticeResults(prev => ({ ...prev, [item.id]: true }));
+                    }}
+                  >
+                    정답 대조
+                  </button>
+                </div>
+              ) : (
+                <div className="writing-comparison-view" onClick={(e) => e.stopPropagation()}>
+                  <div className="compare-item user-input">
+                    <span className="compare-badge user">내 영작</span>
+                    <span className="compare-text">{practiceInputs[item.id] || '(작성 내용 없음)'}</span>
+                  </div>
+                  <div className="compare-item original-sentence">
+                    <span className="compare-badge answer">정답 원문</span>
+                    <span className="compare-text answer-highlight">{item.text}</span>
+                    <button 
+                      type="button" 
+                      className="compare-voice-btn" 
+                      title="원문 발음 듣기"
+                      onClick={(e) => handleSpeak(item.text, e)}
+                    >
+                      <Volume2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 연결된 서재 학습 자산 (추출된 단어 · 문법 · 숙어) */}
@@ -1269,6 +1416,61 @@ export default function SentenceManager({ onPlayPlaylist }) {
               </select>
             </div>
           </div>
+
+          {/* 셀프 테스트 가리기 모드: [영어가리기] [한글가리기] */}
+          <div className="mask-study-bar">
+            <div className="mask-study-info">
+              <Sparkles size={13} className="mask-sparkle-icon" />
+              <span className="mask-study-title">가리기 학습</span>
+            </div>
+            <div className="mask-study-actions">
+              <button
+                type="button"
+                className={`mask-btn ${hideEnglish ? 'is-active' : ''}`}
+                onClick={handleToggleHideEnglish}
+                title="영어를 가리고 한국어를 보며 영작 연습하기"
+              >
+                {hideEnglish ? <EyeOff size={13} /> : <Eye size={13} />}
+                <span>영어가리기</span>
+                {hideEnglish && <span className="mask-dot" />}
+              </button>
+              <button
+                type="button"
+                className={`mask-btn ${hideKorean ? 'is-active' : ''}`}
+                onClick={handleToggleHideKorean}
+                title="한글 번역을 가리고 영어 문장 이해도 확인하기"
+              >
+                {hideKorean ? <EyeOff size={13} /> : <Eye size={13} />}
+                <span>한글가리기</span>
+                {hideKorean && <span className="mask-dot" />}
+              </button>
+              {(hideEnglish || hideKorean) && (
+                <button
+                  type="button"
+                  className="mask-clear-btn"
+                  onClick={() => {
+                    setHideEnglish(false);
+                    setHideKorean(false);
+                    setRevealedEnMap({});
+                    setRevealedKoMap({});
+                  }}
+                  title="가리기 모두 해제"
+                >
+                  모두 보기
+                </button>
+              )}
+            </div>
+          </div>
+
+          {(hideEnglish || hideKorean) && (
+            <div className="mask-guide-banner animate-fade-in">
+              💡 {hideEnglish && hideKorean 
+                ? '영어와 한글이 모두 가려져 있습니다. 각 영역을 터치하면 정답을 바로 확인할 수 있어요!'
+                : hideEnglish 
+                  ? '영어가 가려져 있습니다. 한글을 보고 영작을 떠올린 후, 가려진 영역을 탭하여 확인해보세요!'
+                  : '한글 번역이 가려져 있습니다. 영어를 읽고 뜻을 생각한 후, 가려진 영역을 탭하여 확인해보세요!'}
+            </div>
+          )}
 
           {/* 주제별 모드일 때: 내가 등록/사용한 주제 목록 칩 필터 */}
           {filterMode === 'tag' && (

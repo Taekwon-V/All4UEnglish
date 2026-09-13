@@ -1893,3 +1893,330 @@
   line-height: 1.4;
 }
 
+/* ==========================================================================
+   셀프 테스트 가리기 모드 (영어가리기 / 한글가리기) 툴바 & 인터랙션
+   ========================================================================== */
+.mask-study-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+  transition: all 0.2s ease;
+}
+
+.mask-study-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mask-sparkle-icon {
+  color: #059669;
+}
+
+.mask-study-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.mask-study-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mask-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.mask-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.mask-btn.is-active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.15);
+}
+
+.mask-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.mask-clear-btn {
+  background: transparent;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #059669;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.mask-clear-btn:hover {
+  color: #047857;
+}
+
+.mask-guide-banner {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 10px;
+  line-height: 1.4;
+}
+
+/* 마스킹된 텍스트 래퍼 (가려진 상태) */
+.sentence-masked-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.sentence-masked-wrapper.en-mask {
+  background: #f1f5f9;
+  border: 1px dashed #94a3b8;
+  color: #475569;
+}
+
+.sentence-masked-wrapper.en-mask:hover {
+  background: #e2e8f0;
+  border-color: #64748b;
+  transform: translateY(-1px);
+}
+
+.sentence-masked-wrapper.ko-mask {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+  padding: 3px 8px;
+}
+
+.sentence-masked-wrapper.ko-mask:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.mask-icon {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.mask-text-hint {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+/* 마스킹 모드에서 개별 터치로 공개된 텍스트 */
+.sentence-en-text.is-masked-revealed,
+.sentence-ko-text.is-masked-revealed {
+  background: #fefce8;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid #fef08a;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mask-rehide-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #854d0e;
+  background: #fef9c3;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #fde047;
+}
+
+/* ==========================================================================
+   ✍️ 영작 연습 미니 패널 (직접 타이핑 및 정답 대조)
+   ========================================================================== */
+.sentence-writing-practice-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.writing-practice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.writing-practice-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.writing-reset-btn {
+  background: none;
+  border: none;
+  font-size: 11.5px;
+  color: #64748b;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.writing-reset-btn:hover {
+  color: #0f172a;
+}
+
+.writing-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.writing-input-field {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #0f172a;
+  background: #f8fafc;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.writing-input-field:focus {
+  border-color: #10b981;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.writing-compare-btn {
+  padding: 8px 14px;
+  background: #059669;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.writing-compare-btn:hover {
+  background: #047857;
+  transform: translateY(-1px);
+}
+
+.writing-comparison-view {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.compare-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.compare-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.compare-badge.user {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.compare-badge.answer {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.compare-text {
+  flex: 1;
+  color: #334155;
+  word-break: break-word;
+}
+
+.compare-text.answer-highlight {
+  font-weight: 700;
+  color: #059669;
+}
+
+.compare-voice-btn {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #059669;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.compare-voice-btn:hover {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  transform: scale(1.08);
+}
+
+
