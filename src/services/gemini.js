@@ -165,8 +165,11 @@ export const GeminiService = {
      * "correctionReason": "오류 없이 완벽하고 자연스러운 문장입니다! ✨"
 2. [한국어 번역]:
    - 문장에 맞는 매끄러운 구어체 한국어 번역 ("translation")
-3. [단어/문법/숙어 추출 규칙 - 절대 준수]:
-   - 추천 문장에서 핵심 단어 1~3개를 선정하세요.
+3. [단어/문법/숙어 추출 규칙 - 원문 어휘 기준 절대 준수]:
+   - [단어 엄격 규칙]: 반드시 사용자가 입력한 위 [영어 문장]에 실제로 글자 그대로 존재하는 단어만 1~3개 선정하세요.
+     * 원문에 없는 새로운 단어(원문에 없는데 교정 과정에서 임의로 추가된 단어나 유의어 등)를 절대로 추출하지 마세요.
+   - [문법 엄격 규칙]: 반드시 사용자가 입력한 위 [영어 문장]의 실제 문장 구조에서 쓰인 문법 패턴만 작성하세요. 원문에 없는 구조를 지어내지 마세요.
+   - [숙어 엄격 규칙]: 사용자가 입력한 위 [영어 문장]에 실제로 포함된 숙어/관용구만 작성하세요. 없으면 빈 배열([])로 두세요.
    - 각 단어의 "dictionaryMeanings"에는 해당 단어의 **실제 한국어 사전 대표 뜻 1~3개**(예: busy -> ["바쁜", "분주한", "통화 중인"], coffee -> ["커피"])를 정확히 작성하세요.
    - "nuanceKo"에는 "문맥 속에서 감정을 전달하는..." 같은 **상투적이거나 억지스러운 일반론 문구를 절대 쓰지 마세요**. 일상에서 이 단어가 실제 쓰이는 느낌이나 실용적인 꿀팁 1줄만 적으세요. 없으면 빈 문자열("")로 두세요.
 
@@ -201,11 +204,22 @@ export const GeminiService = {
 `;
 
     try {
-      const raw = await callGeminiApi([{ text: prompt }], { temperature: 0.2 });
+      const raw = await callGeminiApi([{ text: prompt }], { temperature: 0.1 });
       const parsed = JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
 
-      // suggestedWords의 dictionaryMeanings 및 품사 필드 보장
+      // 안전장치 1: suggestedWords가 원문에 실제로 존재하는 단어인지 이중 검증 필터링
       if (parsed && Array.isArray(parsed.suggestedWords)) {
+        const sentenceClean = sentence.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+        const sentenceWords = new Set(sentenceClean.split(/\s+/).filter(Boolean));
+
+        parsed.suggestedWords = parsed.suggestedWords.filter(w => {
+          if (!w || !w.word) return false;
+          const cleanW = w.word.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+          if (!cleanW) return false;
+          return sentenceWords.has(cleanW) || Array.from(sentenceWords).some(sw => sw.includes(cleanW) || cleanW.includes(sw));
+        });
+
+        // suggestedWords의 dictionaryMeanings 및 품사 필드 보장
         parsed.suggestedWords = parsed.suggestedWords.map(w => {
           let meanings = w.dictionaryMeanings;
           const cleanWord = (w.word || '').toLowerCase().trim();
