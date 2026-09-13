@@ -270,10 +270,10 @@ export default function App() {
     );
   }
 
-  // 1인 화이트리스트 보안 게이트 (미인증 시)
+  // 1인 화이트리스트 보안 게이트 (미인증 시 - 모바일 스크롤 완벽 허용)
   if (!currentUser) {
     return (
-      <div className="mobile-app-shell">
+      <div className="mobile-app-shell" style={{ overflowY: 'auto' }}>
         <AuthGateBlock.Component
           onLoginSuccess={(user) => setCurrentUser(user)}
         />

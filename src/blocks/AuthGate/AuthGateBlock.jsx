@@ -74,7 +74,9 @@ export function AuthGateComponent({
       }
     } catch (error) {
       console.error('Google 로그인 오류:', error);
-      if (error.code !== 'auth/popup-closed-by-user') {
+      if (error.code === 'auth/popup-blocked') {
+        setErrorMessage('브라우저에서 로그인 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.');
+      } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
         setErrorMessage(error.message || '로그인 중 오류가 발생했습니다.');
       }
     } finally {
