@@ -56,6 +56,9 @@ export default function SentenceManager({ onPlayPlaylist }) {
   const [grammarCheckState, setGrammarCheckState] = useState({ loading: false, result: null });
   const [isTranslatingEdit, setIsTranslatingEdit] = useState(false);
 
+  // AI 서재 학습 자산 추출 후 선택 모달 상태
+  const [assetSelectionModal, setAssetSelectionModal] = useState(null);
+
   const loadData = () => {
     setSentences(StorageService.getSentences());
     setPlaylists(StorageService.getPlaylists());
@@ -283,25 +286,15 @@ export default function SentenceManager({ onPlayPlaylist }) {
 
   // 특정 주제로 플레이리스트 생성 모달 열기
   const handleOpenCreateModalWithTopic = (topic) => {
-    const matching = getSentencesByTopic(topic);
     setNewPlTopic(topic);
-    setNewPlTitle(`[#${topic}] 문장 모음`);
-    setNewPlDesc(`${topic} 주제 문장 (${matching.length.toLocaleString()}개)`);
+    setNewPlTitle('');
+    setNewPlDesc('');
     setIsCreatingPl(true);
   };
 
   // 모달 내 주제 선택 변경 시
   const handleTopicSelectInModal = (topic) => {
     setNewPlTopic(topic);
-    if (topic) {
-      const cnt = getSentencesByTopic(topic).length;
-      if (!newPlTitle || newPlTitle.startsWith('[#')) {
-        setNewPlTitle(`[#${topic}] 문장 모음`);
-      }
-      if (!newPlDesc || newPlDesc.includes('주제 문장')) {
-        setNewPlDesc(`${topic} 주제 문장 (${cnt.toLocaleString()}개)`);
-      }
-    }
   };
 
   // 플레이리스트 생성
@@ -502,64 +495,68 @@ export default function SentenceManager({ onPlayPlaylist }) {
     return { linkedWords, linkedGrammar, linkedIdioms };
   };
 
-  // 문장에서 AI 단어·문법·숙어 추출 및 서재 자동 등록
+  // 문장에서 AI 단어·문법·숙어 추출 후 사용자 선택 팝업 오픈
   const handleExtractAssets = async (sentenceItem) => {
     const sId = sentenceItem.id;
     setExtractingMap(prev => ({ ...prev, [sId]: true }));
     try {
       const result = await GeminiService.discoverFromSentence(sentenceItem.text);
       if (result) {
-        let addedCount = 0;
-        // 1. 단어 저장
-        if (Array.isArray(result.words)) {
-          result.words.forEach(w => {
-            let dictMeanings = w.dictionaryMeanings;
-            if (!Array.isArray(dictMeanings) || dictMeanings.length === 0) {
-              const fallback = w.meaningKo || w.nuanceKo || '';
-              dictMeanings = fallback ? fallback.split(/[,/·\n]/).map(s => s.trim()).filter(Boolean) : [];
-              if (dictMeanings.length === 0) dictMeanings = [w.word];
-            }
-            StorageService.saveWord({
-              word: w.word,
-              phonetic: w.phonetic || '',
-              partOfSpeech: w.partOfSpeech || '단어',
-              dictionaryMeanings: dictMeanings.slice(0, 3),
-              nuanceKo: w.nuanceKo || dictMeanings.join(', '),
-              originalSentence: sentenceItem.text,
-              sentenceId: sId,
-              status: 'learning'
-            });
-            addedCount++;
-          });
-        }
-        // 2. 문법 패턴 저장
+        // 1. 단어 목록 정규화
+        const rawWords = result.suggestedWords || result.words || [];
+        const words = rawWords.map((w, idx) => {
+          let dictMeanings = w.dictionaryMeanings;
+          if (!Array.isArray(dictMeanings) || dictMeanings.length === 0) {
+            const fallback = w.meaningKo || w.nuanceKo || '';
+            dictMeanings = fallback ? fallback.split(/[,/·\n]/).map(s => s.trim()).filter(Boolean) : [];
+            if (dictMeanings.length === 0) dictMeanings = [w.word];
+          }
+          return {
+            id: `word_${idx}_${Date.now()}`,
+            word: w.word,
+            phonetic: w.phonetic || '',
+            partOfSpeech: w.partOfSpeech || '단어',
+            dictionaryMeanings: dictMeanings.slice(0, 3),
+            nuanceKo: w.nuanceKo || dictMeanings.join(', '),
+            selected: true
+          };
+        });
+
+        // 2. 문법 패턴 정규화
+        let grammar = null;
         if (result.suggestedGrammar?.pattern) {
-          StorageService.saveGrammar({
+          grammar = {
+            id: `grammar_${Date.now()}`,
             pattern: result.suggestedGrammar.pattern,
             tag: result.suggestedGrammar.tag || '#문법패턴',
             explanation: result.suggestedGrammar.explanation || '',
-            originalSentence: sentenceItem.text,
-            sentenceId: sId,
-            status: 'learning'
-          });
-          addedCount++;
+            selected: true
+          };
         }
-        // 3. 숙어 저장
-        if (Array.isArray(result.idioms)) {
-          result.idioms.forEach(i => {
-            StorageService.saveIdiom({
-              idiom: i.idiom,
-              meaning: i.meaning,
-              originalSentence: sentenceItem.text,
-              sentenceId: sId,
-              status: 'learning'
-            });
-            addedCount++;
-          });
+
+        // 3. 숙어 목록 정규화
+        const rawIdioms = result.suggestedIdioms || result.idioms || [];
+        const idioms = rawIdioms.map((i, idx) => ({
+          id: `idiom_${idx}_${Date.now()}`,
+          idiom: i.idiom,
+          meaning: i.meaning,
+          selected: true
+        }));
+
+        const totalFound = words.length + (grammar ? 1 : 0) + idioms.length;
+        if (totalFound === 0) {
+          setToastMessage('문장에서 추출할 수 있는 단어·문법·숙어가 없습니다.');
+          setTimeout(() => setToastMessage(null), 2500);
+          return;
         }
-        loadData();
-        setToastMessage(`✨ 단어·문법·숙어가 추출되어 서재에 연결되었습니다! (${addedCount}개)`);
-        setTimeout(() => setToastMessage(null), 2500);
+
+        // 팝업 모달 열기
+        setAssetSelectionModal({
+          sentenceItem,
+          words,
+          grammar,
+          idioms
+        });
       }
     } catch (e) {
       console.error('추출 실패:', e);
@@ -568,6 +565,97 @@ export default function SentenceManager({ onPlayPlaylist }) {
     } finally {
       setExtractingMap(prev => ({ ...prev, [sId]: false }));
     }
+  };
+
+  // 서재 자산 선택 모달 토글 및 저장 핸들러
+  const handleToggleSelectAllAssets = () => {
+    if (!assetSelectionModal) return;
+    const { words, grammar, idioms } = assetSelectionModal;
+    const allSelected = 
+      words.every(w => w.selected) && 
+      (!grammar || grammar.selected) && 
+      idioms.every(i => i.selected);
+
+    const nextState = !allSelected;
+    setAssetSelectionModal(prev => ({
+      ...prev,
+      words: prev.words.map(w => ({ ...w, selected: nextState })),
+      grammar: prev.grammar ? { ...prev.grammar, selected: nextState } : null,
+      idioms: prev.idioms.map(i => ({ ...i, selected: nextState }))
+    }));
+  };
+
+  const handleToggleWordSelect = (id) => {
+    setAssetSelectionModal(prev => ({
+      ...prev,
+      words: prev.words.map(w => w.id === id ? { ...w, selected: !w.selected } : w)
+    }));
+  };
+
+  const handleToggleGrammarSelect = () => {
+    setAssetSelectionModal(prev => ({
+      ...prev,
+      grammar: prev.grammar ? { ...prev.grammar, selected: !prev.grammar.selected } : null
+    }));
+  };
+
+  const handleToggleIdiomSelect = (id) => {
+    setAssetSelectionModal(prev => ({
+      ...prev,
+      idioms: prev.idioms.map(i => i.id === id ? { ...i, selected: !i.selected } : i)
+    }));
+  };
+
+  const handleSaveSelectedAssets = () => {
+    if (!assetSelectionModal) return;
+    const { sentenceItem, words, grammar, idioms } = assetSelectionModal;
+    const sId = sentenceItem.id;
+    let savedCount = 0;
+
+    // 1. 선택된 단어 저장
+    words.filter(w => w.selected).forEach(w => {
+      StorageService.saveWord({
+        word: w.word,
+        phonetic: w.phonetic,
+        partOfSpeech: w.partOfSpeech,
+        dictionaryMeanings: w.dictionaryMeanings,
+        nuanceKo: w.nuanceKo,
+        originalSentence: sentenceItem.text,
+        sentenceId: sId,
+        status: 'learning'
+      });
+      savedCount++;
+    });
+
+    // 2. 선택된 문법 패턴 저장
+    if (grammar && grammar.selected) {
+      StorageService.saveGrammar({
+        pattern: grammar.pattern,
+        tag: grammar.tag,
+        explanation: grammar.explanation,
+        originalSentence: sentenceItem.text,
+        sentenceId: sId,
+        status: 'learning'
+      });
+      savedCount++;
+    }
+
+    // 3. 선택된 숙어 저장
+    idioms.filter(i => i.selected).forEach(i => {
+      StorageService.saveIdiom({
+        idiom: i.idiom,
+        meaning: i.meaning,
+        originalSentence: sentenceItem.text,
+        sentenceId: sId,
+        status: 'learning'
+      });
+      savedCount++;
+    });
+
+    loadData();
+    setAssetSelectionModal(null);
+    setToastMessage(`선택한 ${savedCount}개의 학습 자산이 서재에 연결되었습니다!`);
+    setTimeout(() => setToastMessage(null), 2500);
   };
 
   // 연결된 서재 자산 학습 상태 토글
@@ -678,14 +766,15 @@ export default function SentenceManager({ onPlayPlaylist }) {
 
               <button 
                 type="button" 
-                className="exp-action-btn icon-only-btn playlist-btn"
+                className="exp-action-btn playlist-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   setTargetSentenceForPl(item);
                 }}
                 title="플레이리스트 담기"
               >
-                <Plus size={17} />
+                <span>Playlist</span>
+                <Plus size={13} strokeWidth={2.5} />
               </button>
 
               <button 
@@ -710,10 +799,10 @@ export default function SentenceManager({ onPlayPlaylist }) {
                   className="extract-assets-btn"
                   onClick={() => handleExtractAssets(item)}
                   disabled={isExtractingAssets}
-                  title="AI로 이 문장에서 단어, 문법, 숙어를 추출하여 서재에 자동 연결"
+                  title="AI로 이 문장에서 단어, 문법, 숙어를 추출하여 서재에 선택 연결"
                 >
-                  <Wand2 size={12} />
-                  <span>{isExtractingAssets ? 'AI 추출 중...' : '✨ AI 단어·숙어·문법 추출'}</span>
+                  <Wand2 size={13} />
+                  <span>{isExtractingAssets ? 'AI 분석 중...' : 'AI 단어·숙어·문법 추출'}</span>
                 </button>
               </div>
 
@@ -824,7 +913,7 @@ export default function SentenceManager({ onPlayPlaylist }) {
               {linkedWords.length === 0 && linkedGrammar.length === 0 && linkedIdioms.length === 0 && (
                 <div className="empty-assets-box">
                   <span>아직 이 문장에서 추출된 서재 항목이 없습니다.</span>
-                  <span className="empty-assets-hint">상단의 [✨ AI 단어·숙어·문법 추출]을 누르면 즉시 분석되어 서재와 자동 연결됩니다.</span>
+                  <span className="empty-assets-hint">상단의 [AI 단어·숙어·문법 추출]을 누르면 분석 후 원하는 항목을 선택하여 서재에 담을 수 있습니다.</span>
                 </div>
               )}
             </div>
@@ -1287,7 +1376,7 @@ export default function SentenceManager({ onPlayPlaylist }) {
               <label className="modal-field-label">플레이리스트 이름</label>
               <input 
                 type="text" 
-                placeholder="예: [#BUI] 문장 모음" 
+                placeholder="플레이리스트 이름 입력" 
                 value={newPlTitle}
                 onChange={(e) => setNewPlTitle(e.target.value)}
                 className="modal-input"
@@ -1298,7 +1387,7 @@ export default function SentenceManager({ onPlayPlaylist }) {
               <label className="modal-field-label">설명 (선택)</label>
               <input 
                 type="text" 
-                placeholder="설명 (선택)" 
+                placeholder="설명 입력 (선택)" 
                 value={newPlDesc}
                 onChange={(e) => setNewPlDesc(e.target.value)}
                 className="modal-input"
@@ -1550,6 +1639,187 @@ export default function SentenceManager({ onPlayPlaylist }) {
                 disabled={!editForm.text.trim()}
               >
                 수정 완료
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 서재 학습 자산 선택 추가 모달 */}
+      {assetSelectionModal && (
+        <div className="modal-backdrop" onClick={() => setAssetSelectionModal(null)}>
+          <div className="modal-sheet asset-selection-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="asset-sheet-header">
+              <div className="asset-sheet-title">
+                <Layers size={18} color="#059669" />
+                <h3>서재 학습 자산 선택</h3>
+              </div>
+              <button 
+                type="button" 
+                className="edit-close-x" 
+                onClick={() => setAssetSelectionModal(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="modal-guide">
+              AI가 추출한 항목 중 서재에 저장할 것만 선택해 주세요.
+            </p>
+
+            <div className="asset-sentence-preview">
+              "{assetSelectionModal.sentenceItem.text}"
+            </div>
+
+            <div className="asset-selection-controls">
+              <span className="selected-count-badge">
+                선택됨 {
+                  assetSelectionModal.words.filter(w => w.selected).length +
+                  (assetSelectionModal.grammar?.selected ? 1 : 0) +
+                  assetSelectionModal.idioms.filter(i => i.selected).length
+                } / {
+                  assetSelectionModal.words.length +
+                  (assetSelectionModal.grammar ? 1 : 0) +
+                  assetSelectionModal.idioms.length
+                }개
+              </span>
+              <button
+                type="button"
+                className="select-all-toggle-btn"
+                onClick={handleToggleSelectAllAssets}
+              >
+                {assetSelectionModal.words.every(w => w.selected) &&
+                 (!assetSelectionModal.grammar || assetSelectionModal.grammar.selected) &&
+                 assetSelectionModal.idioms.every(i => i.selected) ? '전체 해제' : '전체 선택'}
+              </button>
+            </div>
+
+            <div className="asset-selection-list">
+              {/* 1. 단어 */}
+              {assetSelectionModal.words.length > 0 && (
+                <div className="asset-group-block">
+                  <div className="asset-group-title">
+                    📖 단어장 ({assetSelectionModal.words.length})
+                  </div>
+                  <div className="asset-check-items">
+                    {assetSelectionModal.words.map(w => (
+                      <div 
+                        key={w.id} 
+                        className={`asset-check-row ${w.selected ? 'checked' : ''}`}
+                        onClick={() => handleToggleWordSelect(w.id)}
+                      >
+                        <input 
+                          type="checkbox" 
+                          checked={w.selected} 
+                          onChange={() => {}} 
+                          className="asset-checkbox"
+                        />
+                        <div className="asset-check-content">
+                          <div className="asset-check-top">
+                            <span className="asset-check-term">{w.word}</span>
+                            {w.phonetic && <span className="asset-check-phonetic">{w.phonetic}</span>}
+                            {w.partOfSpeech && <span className="asset-check-pos">{w.partOfSpeech}</span>}
+                          </div>
+                          <div className="asset-check-meanings">
+                            {w.dictionaryMeanings.join(', ')}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 2. 문법 패턴 */}
+              {assetSelectionModal.grammar && (
+                <div className="asset-group-block">
+                  <div className="asset-group-title">
+                    📐 문법 패턴
+                  </div>
+                  <div className="asset-check-items">
+                    <div 
+                      className={`asset-check-row ${assetSelectionModal.grammar.selected ? 'checked' : ''}`}
+                      onClick={handleToggleGrammarSelect}
+                    >
+                      <input 
+                        type="checkbox" 
+                        checked={assetSelectionModal.grammar.selected} 
+                        onChange={() => {}} 
+                        className="asset-checkbox"
+                      />
+                      <div className="asset-check-content">
+                        <div className="asset-check-top">
+                          <span className="asset-check-term">{assetSelectionModal.grammar.pattern}</span>
+                          <span className="asset-check-tag">{assetSelectionModal.grammar.tag}</span>
+                        </div>
+                        {assetSelectionModal.grammar.explanation && (
+                          <div className="asset-check-meanings">
+                            {assetSelectionModal.grammar.explanation}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. 숙어 / 표현 */}
+              {assetSelectionModal.idioms.length > 0 && (
+                <div className="asset-group-block">
+                  <div className="asset-group-title">
+                    💡 숙어 및 표현 ({assetSelectionModal.idioms.length})
+                  </div>
+                  <div className="asset-check-items">
+                    {assetSelectionModal.idioms.map(i => (
+                      <div 
+                        key={i.id} 
+                        className={`asset-check-row ${i.selected ? 'checked' : ''}`}
+                        onClick={() => handleToggleIdiomSelect(i.id)}
+                      >
+                        <input 
+                          type="checkbox" 
+                          checked={i.selected} 
+                          onChange={() => {}} 
+                          className="asset-checkbox"
+                        />
+                        <div className="asset-check-content">
+                          <div className="asset-check-top">
+                            <span className="asset-check-term">{i.idiom}</span>
+                          </div>
+                          <div className="asset-check-meanings">
+                            {i.meaning}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                className="modal-btn cancel" 
+                onClick={() => setAssetSelectionModal(null)}
+              >
+                취소
+              </button>
+              <button 
+                type="button" 
+                className="modal-btn submit" 
+                onClick={handleSaveSelectedAssets}
+                disabled={
+                  assetSelectionModal.words.filter(w => w.selected).length +
+                  (assetSelectionModal.grammar?.selected ? 1 : 0) +
+                  assetSelectionModal.idioms.filter(i => i.selected).length === 0
+                }
+              >
+                선택 항목 서재에 담기 ({
+                  assetSelectionModal.words.filter(w => w.selected).length +
+                  (assetSelectionModal.grammar?.selected ? 1 : 0) +
+                  assetSelectionModal.idioms.filter(i => i.selected).length
+                }개)
               </button>
             </div>
           </div>
