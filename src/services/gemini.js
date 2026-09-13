@@ -419,5 +419,68 @@ ${type === 'word' ? `
         { en: `It took a few days to figure it out.`, ko: `그것을 파악하는 데 며칠이 걸렸습니다.` }
       ];
     }
+  },
+
+  /**
+   * 문장 문법 오류 및 원어민 표현 자연스러움 정밀 점검
+   */
+  checkGrammarAndPolish: async (sentenceText) => {
+    if (!sentenceText || !sentenceText.trim()) {
+      return null;
+    }
+    const cleanText = sentenceText.trim();
+    const prompt = `
+당신은 최고의 영어 문법 및 원어민 회화 전문 에디터입니다.
+다음 영어 문장의 문법적 정확성과 원어민 표현의 자연스러움을 정밀하게 진단해주세요:
+
+"${cleanText}"
+
+[진단 기준]
+1. status:
+   - "perfect": 문법적으로 완전무결하고 원어민 표현으로도 매우 자연스러운 경우
+   - "grammar_error": 철자, 시제, 수일치, 전치사, 품사 등 명백한 문법적 오류가 있는 경우
+   - "polish_needed": 문법상으로는 틀리지 않았으나 원어민이 잘 쓰지 않거나 어색하여 더 자연스러운 표현이 권장되는 경우
+2. correctedText: 교정/개선된 최적의 영어 문장 (status가 "perfect"라면 원본 문장 유지)
+3. translation: 교정된 문장의 자연스러운 한국어 번역
+4. explanation: 한국어로 된 핵심 설명 1~2줄 (무엇이 틀렸는지 또는 왜 이 표현이 더 자연스러운지 핵심만 명확히)
+
+응답은 반드시 아래 JSON 스키마로만 작성하세요:
+{
+  "status": "perfect" | "grammar_error" | "polish_needed",
+  "correctedText": "교정된 영어 문장",
+  "translation": "한국어 번역",
+  "explanation": "설명"
+}
+오직 JSON만 응답하세요.
+`;
+
+    try {
+      const raw = await callGeminiApi([{ text: prompt }], { temperature: 0.1 });
+      const parsed = JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
+      return parsed;
+    } catch (e) {
+      console.error('checkGrammarAndPolish 에러:', e.message);
+      return {
+        status: 'perfect',
+        correctedText: cleanText,
+        translation: '',
+        explanation: '문법 검사 중 오류가 발생했거나 오프라인 상태입니다.'
+      };
+    }
+  },
+
+  /**
+   * 빠른 영어 -> 한국어 번역기
+   */
+  quickTranslate: async (englishText) => {
+    if (!englishText || !englishText.trim()) return '';
+    const prompt = `Translate the following English sentence into natural, friendly Korean. Output ONLY the Korean translation, no quotes or additional text.\n\n"${englishText.trim()}"`;
+    try {
+      const raw = await callGeminiApi([{ text: prompt }], { temperature: 0.1, responseMimeType: 'text/plain' });
+      return raw.replace(/^["']|["']$/g, '').trim();
+    } catch (e) {
+      console.error('quickTranslate 에러:', e.message);
+      return '';
+    }
   }
 };

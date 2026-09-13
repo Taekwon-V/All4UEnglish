@@ -4,7 +4,7 @@ import {
   Trash2, FolderPlus, Check, ChevronRight, Headphones, 
   CheckCircle2, RotateCcw, Search, Sparkles, BookOpen,
   Calendar, Tag, ChevronDown, ChevronUp, ArrowUpDown, X,
-  Wand2, Layers
+  Wand2, Layers, Edit3, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { StorageService } from '../../services/storage';
 import { SpeechService } from '../../services/speech';
@@ -48,6 +48,13 @@ export default function SentenceManager({ onPlayPlaylist }) {
 
   // 문장 -> 플레이리스트 담기 모달
   const [targetSentenceForPl, setTargetSentenceForPl] = useState(null);
+
+  // 문장 수정 및 AI 문법 점검 모달 상태
+  const [editingSentence, setEditingSentence] = useState(null);
+  const [editForm, setEditForm] = useState({ text: '', translation: '', tags: [] });
+  const [newTagInputForEdit, setNewTagInputForEdit] = useState('');
+  const [grammarCheckState, setGrammarCheckState] = useState({ loading: false, result: null });
+  const [isTranslatingEdit, setIsTranslatingEdit] = useState(false);
 
   const loadData = () => {
     setSentences(StorageService.getSentences());
@@ -339,6 +346,117 @@ export default function SentenceManager({ onPlayPlaylist }) {
     }
   };
 
+  // 문장 수정 모달 열기
+  const handleStartEdit = (sentence) => {
+    setEditingSentence(sentence);
+    const tags = Array.isArray(sentence.tags)
+      ? sentence.tags.map(t => t.replace(/^#/, '').trim()).filter(Boolean)
+      : [];
+    setEditForm({
+      text: sentence.text || '',
+      translation: sentence.translation || '',
+      tags: tags
+    });
+    setNewTagInputForEdit('');
+    setGrammarCheckState({ loading: false, result: null });
+  };
+
+  // 문장 수정 모달 닫기
+  const handleCloseEdit = () => {
+    setEditingSentence(null);
+    setGrammarCheckState({ loading: false, result: null });
+  };
+
+  // 문장 수정 내용 저장
+  const handleSaveEdit = () => {
+    if (!editingSentence) return;
+    if (!editForm.text.trim()) {
+      alert('영어 문장을 입력해주세요.');
+      return;
+    }
+
+    const updatedTags = editForm.tags.map(t => `#${t.replace(/^#/, '').trim()}`);
+    StorageService.updateSentence(editingSentence.id, {
+      text: editForm.text.trim(),
+      translation: editForm.translation.trim(),
+      tags: updatedTags
+    });
+
+    setToastMessage('🎉 문장이 성공적으로 수정되었습니다!');
+    setTimeout(() => setToastMessage(null), 3000);
+    handleCloseEdit();
+    loadData();
+  };
+
+  // AI 문법 및 표현 점검 실행
+  const handleRunGrammarCheck = async () => {
+    if (!editForm.text.trim()) {
+      alert('점검할 영어 문장을 입력해주세요.');
+      return;
+    }
+    setGrammarCheckState({ loading: true, result: null });
+    try {
+      const res = await GeminiService.checkGrammarAndPolish(editForm.text.trim());
+      setGrammarCheckState({ loading: false, result: res });
+    } catch {
+      setGrammarCheckState({
+        loading: false,
+        result: {
+          status: 'error',
+          explanation: 'AI 점검에 실패했습니다. 다시 시도해주세요.'
+        }
+      });
+    }
+  };
+
+  // AI 교정문 입력창에 원클릭 적용
+  const handleApplyCorrection = () => {
+    if (!grammarCheckState.result || !grammarCheckState.result.correctedText) return;
+    const { correctedText, translation } = grammarCheckState.result;
+    setEditForm(prev => ({
+      ...prev,
+      text: correctedText,
+      translation: translation ? translation : prev.translation
+    }));
+    setToastMessage('⚡ 교정된 문장이 입력창에 적용되었습니다!');
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  // 수정 모달 내 번역 자동 생성
+  const handleAutoTranslateEdit = async () => {
+    if (!editForm.text.trim()) return;
+    setIsTranslatingEdit(true);
+    try {
+      const ko = await GeminiService.quickTranslate(editForm.text.trim());
+      if (ko) {
+        setEditForm(prev => ({ ...prev, translation: ko }));
+      }
+    } finally {
+      setIsTranslatingEdit(false);
+    }
+  };
+
+  // 수정 모달 내 태그 삭제
+  const handleRemoveTagInEdit = (tagToRemove) => {
+    setEditForm(prev => ({
+      ...prev,
+      tags: prev.tags.filter(t => t !== tagToRemove)
+    }));
+  };
+
+  // 수정 모달 내 새 태그 추가
+  const handleAddTagInEdit = () => {
+    const clean = newTagInputForEdit.replace(/^#/, '').trim();
+    if (!clean) return;
+    if (!editForm.tags.includes(clean)) {
+      setEditForm(prev => ({
+        ...prev,
+        tags: [...prev.tags, clean]
+      }));
+    }
+    setNewTagInputForEdit('');
+  };
+
   // 문장과 연결된 서재 학습 자산 (단어, 문법, 숙어) 필터링
   const getLinkedAssets = (sentenceItem) => {
     const sId = sentenceItem.id;
@@ -543,6 +661,19 @@ export default function SentenceManager({ onPlayPlaylist }) {
                   <span>다시 학습하기</span>
                 </button>
               )}
+
+              <button 
+                type="button" 
+                className="exp-action-btn edit-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStartEdit(item);
+                }}
+                title="문장 수정 및 AI 문법 점검"
+              >
+                <Edit3 size={13} />
+                <span>문장 수정</span>
+              </button>
 
               <button 
                 type="button" 
@@ -1235,6 +1366,189 @@ export default function SentenceManager({ onPlayPlaylist }) {
             <div className="modal-actions">
               <button type="button" className="modal-btn cancel" onClick={() => setTargetSentenceForPl(null)}>
                 닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 문장 수정 및 AI 문법·표현 점검 모달 */}
+      {editingSentence && (
+        <div className="modal-backdrop">
+          <div className="modal-sheet edit-sentence-sheet">
+            <div className="edit-sheet-header">
+              <div className="edit-sheet-title">
+                <Edit3 size={18} color="#059669" />
+                <h3>문장 수정 & AI 문법 점검</h3>
+              </div>
+              <button 
+                type="button" 
+                className="edit-close-x" 
+                onClick={handleCloseEdit}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* 영어 문장 입력 + AI 점검 트리거 */}
+            <div className="modal-field">
+              <div className="modal-field-header-row">
+                <label className="modal-field-label">영어 문장</label>
+                <button
+                  type="button"
+                  className="ai-grammar-trigger-btn"
+                  onClick={handleRunGrammarCheck}
+                  disabled={grammarCheckState.loading || !editForm.text.trim()}
+                >
+                  <Sparkles size={13} />
+                  <span>{grammarCheckState.loading ? 'AI 점검 중...' : '✨ AI 문법·표현 점검'}</span>
+                </button>
+              </div>
+              <textarea
+                rows={3}
+                className="modal-input modal-textarea"
+                value={editForm.text}
+                onChange={(e) => {
+                  setEditForm(prev => ({ ...prev, text: e.target.value }));
+                  if (grammarCheckState.result) {
+                    setGrammarCheckState({ loading: false, result: null });
+                  }
+                }}
+                placeholder="영어 문장을 입력하세요"
+              />
+            </div>
+
+            {/* AI 문법 진단 결과 카드 */}
+            {grammarCheckState.result && (
+              <div className={`grammar-result-card status-${grammarCheckState.result.status}`}>
+                <div className="grammar-res-top">
+                  {grammarCheckState.result.status === 'perfect' && (
+                    <span className="grammar-badge perfect">
+                      <CheckCircle2 size={14} /> 완벽하고 자연스러운 표현입니다!
+                    </span>
+                  )}
+                  {grammarCheckState.result.status === 'grammar_error' && (
+                    <span className="grammar-badge error">
+                      <AlertCircle size={14} /> 문법 오류 교정 제안
+                    </span>
+                  )}
+                  {grammarCheckState.result.status === 'polish_needed' && (
+                    <span className="grammar-badge polish">
+                      <Sparkles size={14} /> 더 자연스러운 원어민 표현 추천
+                    </span>
+                  )}
+                </div>
+
+                <p className="grammar-res-explanation">{grammarCheckState.result.explanation}</p>
+
+                {grammarCheckState.result.status !== 'perfect' && grammarCheckState.result.correctedText && (
+                  <div className="grammar-suggest-box">
+                    <div className="suggest-text-row">
+                      <span className="suggest-label">추천 문장:</span>
+                      <span className="suggest-text">{grammarCheckState.result.correctedText}</span>
+                    </div>
+                    {grammarCheckState.result.translation && (
+                      <span className="suggest-trans">{grammarCheckState.result.translation}</span>
+                    )}
+                    <button
+                      type="button"
+                      className="grammar-apply-btn"
+                      onClick={handleApplyCorrection}
+                    >
+                      <Check size={13} />
+                      <span>이 문장으로 바로 적용</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 한국어 번역 영역 + 자동 번역 생성 */}
+            <div className="modal-field">
+              <div className="modal-field-header-row">
+                <label className="modal-field-label">한국어 번역</label>
+                <button
+                  type="button"
+                  className="auto-translate-btn"
+                  onClick={handleAutoTranslateEdit}
+                  disabled={isTranslatingEdit || !editForm.text.trim()}
+                  title="영어 문장을 분석하여 한국어로 번역합니다"
+                >
+                  <RefreshCw size={12} className={isTranslatingEdit ? 'spinning' : ''} />
+                  <span>{isTranslatingEdit ? '번역 중...' : '번역 자동 생성'}</span>
+                </button>
+              </div>
+              <input
+                type="text"
+                className="modal-input"
+                value={editForm.translation}
+                onChange={(e) => setEditForm(prev => ({ ...prev, translation: e.target.value }))}
+                placeholder="한국어 해석을 입력하세요"
+              />
+            </div>
+
+            {/* 주제(태그) 편집 영역 */}
+            <div className="modal-field">
+              <label className="modal-field-label">주제 태그</label>
+              <div className="edit-tags-container">
+                {editForm.tags.length === 0 ? (
+                  <span className="no-edit-tags-hint">등록된 태그가 없습니다.</span>
+                ) : (
+                  editForm.tags.map(t => (
+                    <span key={t} className="edit-tag-pill">
+                      #{t}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTagInEdit(t)}
+                        className="edit-tag-remove-x"
+                        title="태그 삭제"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
+              <div className="edit-add-tag-row">
+                <input
+                  type="text"
+                  className="modal-input edit-tag-input"
+                  placeholder="새 태그 추가 (예: 여행)"
+                  value={newTagInputForEdit}
+                  onChange={(e) => setNewTagInputForEdit(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTagInEdit();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn-add-tag-inline"
+                  onClick={handleAddTagInEdit}
+                >
+                  <Plus size={14} /> 추가
+                </button>
+              </div>
+            </div>
+
+            {/* 모달 액션 버튼 */}
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                className="modal-btn cancel" 
+                onClick={handleCloseEdit}
+              >
+                취소
+              </button>
+              <button 
+                type="button" 
+                className="modal-btn submit" 
+                onClick={handleSaveEdit}
+                disabled={!editForm.text.trim()}
+              >
+                수정 완료
               </button>
             </div>
           </div>
