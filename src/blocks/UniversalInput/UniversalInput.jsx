@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { 
   Camera, Mic, Edit3, Sparkles, Volume2, Plus, Check, 
   ArrowRight, BookOpen, Layers, Bookmark, Square, Compass,
-  Wand2, CheckCircle2, Image as ImageIcon
+  Wand2, CheckCircle2, Image as ImageIcon, ListOrdered
 } from 'lucide-react';
 import CropCanvas from './CropCanvas';
 import { SpeechService } from '../../services/speech';
@@ -21,6 +21,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
   const [originalInputText, setOriginalInputText] = useState('');
   const [selectedVersion, setSelectedVersion] = useState('recommended'); // 'recommended' | 'original'
   const [translationText, setTranslationText] = useState('');
+  const [inputSource, setInputSource] = useState('직접 입력'); // '직접 입력' | '사진 인식' | '음성 녹음'
   
   // 사진 크롭 관련 상태 (카메라 / 앨범 분리)
   const [selectedImageSrc, setSelectedImageSrc] = useState(null);
@@ -60,6 +61,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
   const handleCropDone = async (croppedBase64) => {
     setIsCropping(false);
     setIsAnalyzing(true);
+    setInputSource('사진 인식');
     try {
       const ocrResult = await GeminiService.extractTextFromImage(croppedBase64);
       if (ocrResult && ocrResult.text) {
@@ -85,6 +87,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
       SpeechService.startListening(
         (transcript) => {
           setInputText(transcript);
+          setInputSource('음성 녹음');
         },
         () => {
           setIsListening(false);
@@ -151,8 +154,31 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
 
     setIsAnalyzing(true);
     setOriginalInputText(raw);
+
+    // 1) 즉시 1차 문장장에 안전하게 영구 저장 (AI 분석 실패와 무관하게 데이터 100% 보존)
+    let savedSentence = null;
     try {
-      // 1) AI 분석 (오타/문법 교정 및 추천, 단어, 문법, 숙어, 번역)
+      const saved = StorageService.saveSentence({
+        text: raw,
+        originalText: raw,
+        translation: translationText || "자연스러운 일상 영어 표현",
+        source: inputSource || '직접 입력',
+        tags: ["주제없음"]
+      });
+      savedSentence = saved[0];
+      if (savedSentence) {
+        setSavedSentenceId(savedSentence.id);
+        if (onSentenceAdded) {
+          onSentenceAdded(savedSentence);
+        }
+      }
+      setWordToast('✨ 문장학습에 저장 완료되었습니다! AI 분석 중...');
+    } catch (saveErr) {
+      console.error('문장 1차 저장 에러:', saveErr);
+    }
+
+    // 2) AI 분석 (오타/문법 교정 및 추천, 단어, 문법, 숙어, 번역)
+    try {
       const result = await GeminiService.discoverFromSentence(raw);
       setAnalysisResult(result);
       if (result.translation) {
@@ -172,24 +198,33 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
         setInputText(result.correctedSentence.trim());
       }
 
-      // 2) 문장장에 영구 저장
-      const saved = StorageService.saveSentence({
-        text: chosenText,
-        originalText: raw,
-        translation: result.translation || translationText || "자연스러운 일상 영어 표현",
-        source: activeMode === 'camera' ? '사진 인식' : activeMode === 'mic' ? '음성 녹음' : '직접 입력',
-        tags: ["주제없음"]
-      });
-      
-      const newSentence = saved[0];
-      setSavedSentenceId(newSentence?.id);
-      setAddedItems({ words: {}, grammar: false, idioms: {} });
-
-      if (onSentenceAdded) {
-        onSentenceAdded(newSentence);
+      // 3) AI 분석 결과(교정본/번역) 반영하여 문장 데이터 업데이트
+      if (savedSentence?.id) {
+        StorageService.updateSentence(savedSentence.id, {
+          text: chosenText,
+          originalText: raw,
+          translation: result.translation || translationText || "자연스러운 일상 영어 표현",
+          source: inputSource || '직접 입력'
+        });
       }
-    } catch (err) {
-      console.error('분석 에러:', err);
+
+      setAddedItems({ words: {}, grammar: false, idioms: {} });
+      setWordToast('✨ 문장과 AI 어휘 분석이 완료되었습니다!');
+      setTimeout(() => setWordToast(null), 2500);
+    } catch (aiErr) {
+      console.error('AI 분석 에러 (문장은 정상 보존됨):', aiErr);
+      setWordToast('✨ 문장이 문장학습에 저장되었습니다! (AI 분석은 건너뜀)');
+      setTimeout(() => setWordToast(null), 3000);
+      // AI 분석이 실패하더라도 저장은 완료되었으므로 기본 결과 객체 생성하여 완료 상태로 전환
+      setAnalysisResult({
+        hasCorrection: false,
+        correctedSentence: raw,
+        correctionReason: '',
+        translation: translationText || '',
+        suggestedWords: [],
+        suggestedGrammar: null,
+        suggestedIdioms: []
+      });
     } finally {
       setIsAnalyzing(false);
     }
@@ -282,6 +317,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
     setOriginalInputText('');
     setSelectedVersion('recommended');
     setTranslationText('');
+    setInputSource('직접 입력');
     setAnalysisResult(null);
     setSavedSentenceId(null);
     setTappedWords({});
@@ -442,7 +478,10 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
           placeholder="영어 문장을 직접 입력하거나 사진/음성을 선택하세요"
           value={inputText}
           rows={3}
-          onChange={(e) => setInputText(e.target.value)}
+          onChange={(e) => {
+            setInputText(e.target.value);
+            if (inputSource !== '직접 입력') setInputSource('직접 입력');
+          }}
         />
 
         {/* 문장 속 특정 단어 직접 터치하여 단어장에 추가하는 인터랙티브 칩 영역 (중복 단어 자동 제거) */}
@@ -504,14 +543,28 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
 
         <div className="editor-bottom-actions">
           {analysisResult ? (
-            <button 
-              type="button" 
-              className="analyze-btn saved"
-              onClick={handleResetForNext}
-            >
-              <Plus size={16} />
-              <span>새 문장 추가하기</span>
-            </button>
+            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+              <button 
+                type="button" 
+                className="analyze-btn saved"
+                style={{ flex: 1 }}
+                onClick={handleResetForNext}
+              >
+                <Plus size={16} />
+                <span>새 문장 추가하기</span>
+              </button>
+              {onNavigateTo && (
+                <button
+                  type="button"
+                  className="analyze-btn"
+                  style={{ flex: 1, background: 'var(--primary-brand, #2d6a4f)' }}
+                  onClick={() => onNavigateTo('sentences')}
+                >
+                  <ListOrdered size={16} />
+                  <span>문장학습 확인 ➔</span>
+                </button>
+              )}
+            </div>
           ) : (
             <button 
               type="button" 
@@ -520,7 +573,7 @@ export default function UniversalInput({ onSentenceAdded, onNavigateTo }) {
               onClick={handleSaveAndAnalyze}
             >
               <Sparkles size={16} />
-              <span>{isAnalyzing ? 'AI 분석 중...' : '문장 등록 & AI 분석'}</span>
+              <span>{isAnalyzing ? '문장 저장 & AI 분석 중...' : '문장 등록 & AI 분석'}</span>
             </button>
           )}
         </div>

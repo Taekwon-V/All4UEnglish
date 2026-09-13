@@ -242,18 +242,19 @@ export const StorageService = {
       let updated;
       let targetItem;
       if (existingIdx >= 0) {
-        updated = [...sentences];
         targetItem = { 
           ...sentences[existingIdx], 
           ...sentenceData,
-          status: sentenceData.status || sentences[existingIdx].status || 'learning'
+          status: 'learning',
+          updatedAt: new Date().toISOString()
         };
-        updated[existingIdx] = targetItem;
+        const rest = sentences.filter((_, idx) => idx !== existingIdx);
+        updated = [targetItem, ...rest];
       } else {
         targetItem = {
           ...sentenceData,
           id: sentenceData.id || 's-' + Date.now(),
-          status: sentenceData.status || 'learning',
+          status: 'learning',
           tags: sentenceData.tags || [],
           isBookmarked: sentenceData.isBookmarked || false,
           reviewCount: 1,

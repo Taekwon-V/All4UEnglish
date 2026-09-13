@@ -48,18 +48,20 @@ export default function App() {
     return new URLSearchParams(window.location.search).has('block');
   });
 
-  // 메인 5단 탭: 'input' | 'sentences' | 'library' | 'radio' | 'test' (새로고침 시에도 탭 유지)
+  // 메인 5단 탭: 앱 진입 시 첫 화면은 언제나 라디오('radio') 탭 우선
   const [activeTab, setActiveTab] = useState(() => {
     try {
-      return localStorage.getItem('all4u_active_tab') || 'input';
+      const sessionTab = sessionStorage.getItem('all4u_session_tab');
+      return sessionTab || 'radio';
     } catch {
-      return 'input';
+      return 'radio';
     }
   });
 
   const handleSelectTab = (tab) => {
     setActiveTab(tab);
     try {
+      sessionStorage.setItem('all4u_session_tab', tab);
       localStorage.setItem('all4u_active_tab', tab);
     } catch {}
   };
@@ -384,7 +386,7 @@ export default function App() {
         display: 'flex', 
         flexDirection: 'column', 
         overflowY: 'auto', 
-        padding: '10px 16px 8px',
+        padding: '0 16px 8px', 
         paddingBottom: 'calc(var(--safe-bottom, 14px) + 72px)',
         overscrollBehaviorY: 'contain'
       }}>

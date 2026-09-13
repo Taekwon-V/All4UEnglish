@@ -17,9 +17,11 @@
 .test-sticky-header {
   position: sticky;
   top: 0;
-  z-index: 40;
+  z-index: 50;
   background: var(--bg-canvas, #faf7f2);
-  padding: 0 0 8px;
+  padding: 10px 16px 8px;
+  margin: 0 -16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
 .test-category-tabs {
